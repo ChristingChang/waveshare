@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1763691012631,
+      "tag": "0000_damp_mac_gargan",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1763691074680,
+      "tag": "0001_small_shape",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1763694679226,
+      "tag": "0002_tough_black_widow",
+      "breakpoints": true
+    }
+  ]
+}
