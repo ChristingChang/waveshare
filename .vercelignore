@@ -1,0 +1,54 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build outputs (will be rebuilt on Vercel)
+dist
+build
+
+# Development files
+.vscode
+.idea
+
+# Logs
+*.log
+logs
+
+# Testing
+coverage
+*.test.ts
+*.spec.ts
+__tests__
+
+# Documentation (not needed for deployment)
+*.md
+!README.md
+
+# Git
+.git
+.gitignore
+
+# Uploaded files and user content
+uploads
+storage
+screenshots
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp
+temp
+*.tmp
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
