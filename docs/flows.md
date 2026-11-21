@@ -14,22 +14,24 @@ flowchart TD
     E -->|是| G["建立登入狀態並回首頁"]
 ```
 
-## 2. 登入：PR #2（GitHub／TiDB Cloud）
+## 2. 登入：PR #2（Google／TiDB Cloud）
 
-以下假設 GitHub 授權與 TiDB 資料庫已正確設定。
+以下假設 Google 登入與 TiDB Cloud 資料庫已正確設定。
 
 ```mermaid
 flowchart TD
-    A["未登入時開啟 WaveShare"] --> B["自動前往 GitHub 授權"]
-    B --> C{"授權成功且返回資料有效？"}
-    C -->|否| D["回報登入錯誤，不建立登入狀態"]
-    C -->|是| E["依 GitHub 帳號編號在資料庫建立或找回帳號"]
-    E --> F{"寫入帳號成功？"}
-    F -->|否| D
-    F -->|是| G["建立登入狀態並回首頁"]
+    A["開啟 WaveShare"] --> B{"登入狀態仍有效？"}
+    B -->|是| C["進入網站"]
+    B -->|否| D["自動前往 Google 登入與授權"]
+    D --> E{"同意授權且 WaveShare 確認回應有效？"}
+    E -->|否| F["顯示錯誤，不會登入"]
+    E -->|是| G["依 Google 帳號的專屬代號找到或建立 WaveShare 帳號"]
+    G --> H{"帳號資料儲存成功？"}
+    H -->|否| F
+    H -->|是| I["建立登入狀態並回首頁"]
 ```
 
-改用 GitHub 不會自動合併舊 Manus 帳號。即使 Email 相同，第一次用 GitHub 登入仍會建立新帳號。
+即使電子郵件相同，第一次用 Google 登入也會建立新帳號，不會自動合併舊 Manus 帳號。
 
 ## 3. 新增紀錄：現況（後端轉存）
 
