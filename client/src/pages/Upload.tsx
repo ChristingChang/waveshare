@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { TRPCClientError } from "@trpc/client";
 
 export default function Upload() {
   const [, setLocation] = useLocation();
@@ -111,7 +112,8 @@ export default function Upload() {
       });
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error(error instanceof Error && error.message.includes("影片")
+      toast.error(error instanceof TRPCClientError && error.data?.code === "TOO_MANY_REQUESTS"
+        ? error.message : error instanceof Error && error.message.includes("影片")
         ? error.message : "上傳失敗，請檢查網路連線後重試");
       setUploading(false);
     }

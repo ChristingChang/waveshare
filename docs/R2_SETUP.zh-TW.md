@@ -74,6 +74,8 @@
 
 ## 官方參考
 
+每位使用者在滾動的 24 小時內最多申請 10 次影片上傳。申請後即使未上傳、未建立紀錄或刪除紀錄，也會計入次數；簽名或傳輸失敗的申請亦可能計入，請稍後再試。
+
 本教學已對照以下 Cloudflare 官方文件：
 - [預簽上傳網址](https://developers.cloudflare.com/r2/api/s3/presigned-urls/)
 - [CORS 設定](https://developers.cloudflare.com/r2/buckets/cors/)

@@ -5,6 +5,9 @@ import { appRouter } from "./routers.js";
 import { ENV } from "./_core/env.js";
 import { createSurfSession, updateSurfSession, getUserRecentSessions, getUserAllSessions, getUserSessionsByDateRange, getSessionById } from "./db.js";
 import type { TrpcContext } from "./_core/context.js";
+import { reserveVideoUpload } from "./videoUploads.js";
+
+vi.mock("./videoUploads.js", () => ({ reserveVideoUpload: vi.fn() }));
 
 vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl: vi.fn() }));
 vi.mock("./db.js", () => ({
@@ -24,6 +27,7 @@ const session = { date: "2025-11-21", spotName: "烏石港", waveQuality: 4, ...
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(reserveVideoUpload).mockResolvedValue(undefined);
   vi.mocked(getSignedUrl).mockResolvedValue("https://signed.example.com/put");
   vi.mocked(createSurfSession).mockResolvedValue({ insertId: 1 } as never);
   vi.mocked(updateSurfSession).mockResolvedValue({ affectedRows: 1 } as never);
@@ -113,6 +117,19 @@ describe("session playback after an R2 domain change", () => {
 });
 
 describe("R2 presigned uploads", () => {
+  it("does not sign when the rolling upload quota is exhausted", async () => {
+    const { TRPCError } = await import("@trpc/server");
+    vi.mocked(reserveVideoUpload).mockRejectedValueOnce(new TRPCError({ code: "TOO_MANY_REQUESTS", message: "影片上傳已達上限，請稍後再試" }));
+    await expect(caller.surfSessions.presignUpload({ contentType: "video/mp4", size: 10 }))
+      .rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    expect(getSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("does not sign when the upload reservation cannot be persisted", async () => {
+    vi.mocked(reserveVideoUpload).mockRejectedValueOnce(new Error("database unavailable"));
+    await expect(caller.surfSessions.presignUpload({ contentType: "video/mp4", size: 10 })).rejects.toThrow("database unavailable");
+    expect(getSignedUrl).not.toHaveBeenCalled();
+  });
   it("requires authentication", async () => {
     const anonymous = appRouter.createCaller({ ...ctx, user: null });
     await expect(anonymous.surfSessions.presignUpload({ contentType: "video/mp4", size: 10 }))
@@ -137,6 +154,7 @@ describe("R2 presigned uploads", () => {
   ] as const)("signs a scoped %s upload with the content type and size", async (contentType, extension) => {
     const result = await caller.surfSessions.presignUpload({ contentType, size: 100 * 1024 * 1024 });
     expect(result.videoPath).toMatch(new RegExp(`^r2/surf-videos/42/video-\\d+-[a-f0-9]{16}\\.${extension}$`));
+    expect(reserveVideoUpload).toHaveBeenCalledWith(42, result.videoPath);
     expect(result).toEqual({ uploadUrl: "https://signed.example.com/put", videoPath: result.videoPath,
       videoUrl: `https://videos.example.com/${result.videoPath}` });
     const [client, command, options] = vi.mocked(getSignedUrl).mock.calls[0];
