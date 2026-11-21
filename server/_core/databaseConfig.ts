@@ -8,6 +8,6 @@ export function databaseConfig(connectionString: string, databaseSsl?: string) {
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
     database: decodeURIComponent(url.pathname.slice(1)),
-    ssl: tls ? { minVersion: "TLSv1.2" as const, rejectUnauthorized: true } : undefined,
+    ssl: tls ? { minVersion: "TLSv1.2" as const, rejectUnauthorized: true, verifyIdentity: true } : undefined,
   };
 }
