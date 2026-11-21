@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { z } from "zod";
-import { MAX_VIDEO_SIZE, presignVideo, validateVideoReference, withCurrentVideoUrl } from "./r2.js";
+import { MAX_VIDEO_SIZE, deleteR2Video, presignVideo, validateVideoReference, withCurrentVideoUrl } from "./r2.js";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -144,9 +144,11 @@ export const appRouter = router({
         // Delete from database
         await deleteSurfSession(input.id, ctx.user.id);
         
-        // TODO: Delete video from S3 storage
-        // const { storageDelete } = await import("./storage.js");
-        // await storageDelete(session.videoPath);
+        try {
+          await deleteR2Video(ctx.user.id, session.videoPath);
+        } catch (error) {
+          console.error("[R2] Failed to delete session video:", error);
+        }
         
         return { success: true };
       }),
