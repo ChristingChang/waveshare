@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
+import { createSurfSession } from "./db";
+
+vi.mock("./db", async importOriginal => ({
+  ...await importOriginal<typeof import("./db")>(),
+  createSurfSession: vi.fn().mockResolvedValue({ insertId: 1 }),
+}));
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
@@ -105,5 +111,6 @@ describe("surfSessions", () => {
     const result = await caller.surfSessions.create(newSession);
 
     expect(result).toBeDefined();
+    expect(createSurfSession).toHaveBeenCalledWith({ userId: 1, ...newSession });
   });
 });

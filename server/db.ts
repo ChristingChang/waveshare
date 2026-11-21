@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -103,7 +103,7 @@ export async function getUserRecentSessions(userId: number, limit: number = 3) {
     .select()
     .from(surfSessions)
     .where(eq(surfSessions.userId, userId))
-    .orderBy(surfSessions.date)
+    .orderBy(desc(surfSessions.date), desc(surfSessions.createdAt), desc(surfSessions.id))
     .limit(limit);
   
   return result;
