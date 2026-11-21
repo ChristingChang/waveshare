@@ -29,10 +29,9 @@ describe("Vercel Express handler", () => {
     expect(await response.json()).toEqual({ result: { data: { json: { ok: true } } } });
   });
 
-  it("rejects unauthenticated uploads", async () => {
+  it("removes the legacy video proxy endpoint", async () => {
     const response = await fetch(`${origin}/api/upload-video`, { method: "POST" });
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: "Authentication required" });
+    expect(response.status).toBe(404);
   });
 
   it("registers the OAuth callback", async () => {
