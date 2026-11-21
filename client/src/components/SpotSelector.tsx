@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -16,39 +16,9 @@ interface SpotSelectorProps {
 }
 
 export function SpotSelector({ value, onChange, required = false }: SpotSelectorProps) {
-  const [selectedRegion, setSelectedRegion] = useState<Region | "">("");
-  const [availableSpots, setAvailableSpots] = useState<string[]>([]);
-
-  // When region changes, update available spots
-  useEffect(() => {
-    if (selectedRegion) {
-      const spots = getSpotsByRegion(selectedRegion);
-      setAvailableSpots(spots);
-      
-      // If current value is not in the new region's spots, clear it
-      if (value && !spots.includes(value)) {
-        onChange("");
-      }
-    } else {
-      setAvailableSpots([]);
-      onChange("");
-    }
-  }, [selectedRegion]);
-
-  // Initialize region based on current value
-  useEffect(() => {
-    if (value && !selectedRegion) {
-      // Find which region contains this spot
-      for (const region of REGIONS) {
-        const spots = getSpotsByRegion(region);
-        if (spots.includes(value)) {
-          setSelectedRegion(region);
-          setAvailableSpots(spots);
-          break;
-        }
-      }
-    }
-  }, [value]);
+  const [userRegion, setUserRegion] = useState<Region | "">("");
+  const selectedRegion = userRegion || REGIONS.find(region => getSpotsByRegion(region).includes(value)) || "";
+  const availableSpots = selectedRegion ? getSpotsByRegion(selectedRegion) : [];
 
   return (
     <div className="space-y-4">
@@ -59,7 +29,13 @@ export function SpotSelector({ value, onChange, required = false }: SpotSelector
         </Label>
         <Select
           value={selectedRegion}
-          onValueChange={(value) => setSelectedRegion(value as Region)}
+          onValueChange={(region) => {
+            if (!region) return;
+            setUserRegion(region as Region);
+            if (region !== selectedRegion) {
+              onChange("");
+            }
+          }}
         >
           <SelectTrigger id="region">
             <SelectValue placeholder="選擇地區" />
@@ -81,7 +57,9 @@ export function SpotSelector({ value, onChange, required = false }: SpotSelector
         </Label>
         <Select
           value={value}
-          onValueChange={onChange}
+          onValueChange={(spot) => {
+            if (spot) onChange(spot);
+          }}
           disabled={!selectedRegion}
         >
           <SelectTrigger id="spot">
