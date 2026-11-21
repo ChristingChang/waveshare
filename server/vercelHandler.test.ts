@@ -35,8 +35,8 @@ describe("Vercel Express handler", () => {
   });
 
   it("registers the OAuth callback", async () => {
-    const response = await fetch(`${origin}/api/oauth/callback`);
+    const response = await fetch(`${origin}/api/auth/google/callback`);
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "code and state are required" });
+    expect(await response.json()).toEqual({ error: "Invalid OAuth state" });
   });
 });
