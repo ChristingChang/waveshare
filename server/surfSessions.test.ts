@@ -103,8 +103,8 @@ describe("surfSessions", () => {
     const newSession = {
       date: "2025-11-21",
       spotName: "測試浪點",
-      videoUrl: "https://videos.example.com/surf-videos/1/video-123-0123456789abcdef.mp4",
-      videoPath: "surf-videos/1/video-123-0123456789abcdef.mp4",
+      videoUrl: "https://videos.example.com/r2/surf-videos/1/video-123-0123456789abcdef.mp4",
+      videoPath: "r2/surf-videos/1/video-123-0123456789abcdef.mp4",
       waveQuality: 4,
       boardType: "6'2 Shortboard",
       note: "測試心得",

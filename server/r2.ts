@@ -22,7 +22,7 @@ function publicBaseUrl() {
 }
 
 function isR2VideoPath(userId: number, videoPath: string) {
-  const prefix = `surf-videos/${userId}/`;
+  const prefix = `r2/surf-videos/${userId}/`;
   return videoPath.startsWith(prefix) && /^video-\d+-[a-f0-9]{16}\.(mp4|mov|webm)$/.test(videoPath.slice(prefix.length));
 }
 
@@ -46,7 +46,7 @@ export async function presignVideo(userId: number, contentType: keyof typeof VID
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "影片儲存服務尚未設定：請設定 R2_ACCOUNT_ID、R2_ACCESS_KEY_ID、R2_SECRET_ACCESS_KEY 與 R2_BUCKET" });
   }
   const baseUrl = publicBaseUrl();
-  const videoPath = `surf-videos/${userId}/video-${Date.now()}-${randomBytes(8).toString("hex")}.${VIDEO_TYPES[contentType]}`;
+  const videoPath = `r2/surf-videos/${userId}/video-${Date.now()}-${randomBytes(8).toString("hex")}.${VIDEO_TYPES[contentType]}`;
   const client = new S3Client({
     endpoint: `https://${ENV.r2AccountId}.r2.cloudflarestorage.com`,
     region: "auto",

@@ -18,7 +18,7 @@ vi.mock("./_core/env.js", () => ({ ENV: {
 
 const ctx = { user: { id: 42 }, req: {}, res: {} } as TrpcContext;
 const caller = appRouter.createCaller(ctx);
-const videoPath = "surf-videos/42/video-123-0123456789abcdef.mp4";
+const videoPath = "r2/surf-videos/42/video-123-0123456789abcdef.mp4";
 const reference = { videoPath, videoUrl: `https://videos.example.com/${videoPath}` };
 const session = { date: "2025-11-21", spotName: "烏石港", waveQuality: 4, ...reference };
 
@@ -60,7 +60,7 @@ describe("session playback after an R2 domain change", () => {
   });
 
   it.each(readers)("$name leaves legacy Forge paths and URLs untouched", async ({ read }) => {
-    const legacy = { ...storedSession, videoPath: "surf-videos/video-123-0123456789abcdef.mp4", videoUrl: "https://forge.example.com/legacy.mp4" };
+    const legacy = { ...storedSession, videoPath: "surf-videos/42/video-123-0123456789abcdef.mp4", videoUrl: "https://forge.example.com/legacy.mp4" };
     mockReads(legacy);
     const original = ENV.r2PublicUrl;
     ENV.r2PublicUrl = "";
@@ -136,7 +136,7 @@ describe("R2 presigned uploads", () => {
     ["video/mp4", "mp4"], ["video/quicktime", "mov"], ["video/webm", "webm"],
   ] as const)("signs a scoped %s upload with the content type and size", async (contentType, extension) => {
     const result = await caller.surfSessions.presignUpload({ contentType, size: 100 * 1024 * 1024 });
-    expect(result.videoPath).toMatch(new RegExp(`^surf-videos/42/video-\\d+-[a-f0-9]{16}\\.${extension}$`));
+    expect(result.videoPath).toMatch(new RegExp(`^r2/surf-videos/42/video-\\d+-[a-f0-9]{16}\\.${extension}$`));
     expect(result).toEqual({ uploadUrl: "https://signed.example.com/put", videoPath: result.videoPath,
       videoUrl: `https://videos.example.com/${result.videoPath}` });
     const [client, command, options] = vi.mocked(getSignedUrl).mock.calls[0];
@@ -199,7 +199,8 @@ describe("session video ownership", () => {
   it.each([
     { videoPath: videoPath.replace("/42/", "/43/"), videoUrl: reference.videoUrl },
     { videoPath: videoPath.replace("/42/", "/420/"), videoUrl: reference.videoUrl },
-    { videoPath: "surf-videos/42/../43/video-123-0123456789abcdef.mp4", videoUrl: reference.videoUrl },
+    { videoPath: "r2/surf-videos/42/../43/video-123-0123456789abcdef.mp4", videoUrl: reference.videoUrl },
+    { videoPath: "surf-videos/42/video-123-0123456789abcdef.mp4", videoUrl: "https://videos.example.com/surf-videos/42/video-123-0123456789abcdef.mp4" },
     { videoPath: "", videoUrl: "" },
     { videoPath, videoUrl: "https://evil.example.com/video.mp4" },
     { videoPath, videoUrl: `${reference.videoUrl}?other=1` },
