@@ -17,23 +17,7 @@ interface SpotSelectorProps {
 
 export function SpotSelector({ value, onChange, required = false }: SpotSelectorProps) {
   const [selectedRegion, setSelectedRegion] = useState<Region | "">("");
-  const [availableSpots, setAvailableSpots] = useState<string[]>([]);
-
-  // When region changes, update available spots
-  useEffect(() => {
-    if (selectedRegion) {
-      const spots = getSpotsByRegion(selectedRegion);
-      setAvailableSpots(spots);
-      
-      // If current value is not in the new region's spots, clear it
-      if (value && !spots.includes(value)) {
-        onChange("");
-      }
-    } else {
-      setAvailableSpots([]);
-      onChange("");
-    }
-  }, [selectedRegion]);
+  const availableSpots = selectedRegion ? getSpotsByRegion(selectedRegion) : [];
 
   // Initialize region based on current value
   useEffect(() => {
@@ -43,7 +27,6 @@ export function SpotSelector({ value, onChange, required = false }: SpotSelector
         const spots = getSpotsByRegion(region);
         if (spots.includes(value)) {
           setSelectedRegion(region);
-          setAvailableSpots(spots);
           break;
         }
       }
@@ -59,7 +42,12 @@ export function SpotSelector({ value, onChange, required = false }: SpotSelector
         </Label>
         <Select
           value={selectedRegion}
-          onValueChange={(value) => setSelectedRegion(value as Region)}
+          onValueChange={(region) => {
+            setSelectedRegion(region as Region);
+            if (region !== selectedRegion) {
+              onChange("");
+            }
+          }}
         >
           <SelectTrigger id="region">
             <SelectValue placeholder="選擇地區" />
