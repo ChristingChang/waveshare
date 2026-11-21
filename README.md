@@ -36,7 +36,7 @@
 - **Express 4** - Node.js Web 應用程式框架
 - **tRPC 11** - 型別安全的 RPC 框架
 - **Drizzle ORM** - TypeScript ORM,支援 MySQL/TiDB
-- **GitHub OAuth / jose** - GitHub 登入與本機簽發的 JWT Session
+- **Google OAuth / jose** - Google 登入與本機簽發的 JWT Session
 - **Cloudflare R2 / AWS SDK** - 短效預簽網址，瀏覽器直接上傳影片
 
 ### 資料庫設計
@@ -56,7 +56,7 @@
 - Node.js 22.13.0 或以上版本
 - pnpm 套件管理工具
 - MySQL 或 TiDB 資料庫
-- GitHub OAuth App（用於登入）；[完整部署教學](docs/DEPLOY.zh-TW.md)
+- Google OAuth App（用於登入）；[完整部署教學](docs/DEPLOY.zh-TW.md)
 
 ### 安裝步驟
 
@@ -79,8 +79,8 @@ cp .env.example .env
 編輯 `.env` 檔案,填入您的資料庫連線資訊與 API 金鑰:
 - `DATABASE_URL` - MySQL/TiDB 連線字串
 - `SESSION_SECRET` - Session 簽章金鑰（請隨機產生並妥善保管）
-- `GITHUB_CLIENT_ID`、`GITHUB_CLIENT_SECRET` - GitHub OAuth App 登入設定
-- `GITHUB_CALLBACK_URL` - 選用；預設為目前網站的 `/api/auth/github/callback`
+- `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` - Google OAuth App 登入設定
+- `GOOGLE_CALLBACK_URL` - 選用；預設為目前網站的 `/api/auth/google/callback`
 - `DATABASE_SSL=true` - 非 TiDB 的資料庫若需要 TLS 可設定；TiDB Cloud 會自動啟用驗證憑證的 TLS
 - `R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_URL` - 影片儲存；請依 [R2 設定教學](docs/R2_SETUP.zh-TW.md) 操作。R2 變數僅限伺服器，不要加 `VITE_` 前綴。
 

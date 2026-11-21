@@ -4,4 +4,4 @@ export const APP_TITLE = import.meta.env.VITE_APP_TITLE || "App";
 
 export const APP_LOGO = "https://placehold.co/128x128/E1E7EF/1F2937?text=App";
 
-export const getLoginUrl = () => "/api/auth/github";
+export const getLoginUrl = () => "/api/auth/google";
