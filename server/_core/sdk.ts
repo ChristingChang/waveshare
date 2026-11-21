@@ -28,7 +28,7 @@ export const sdk = {
       const { payload } = await jwtVerify(token, sessionKey(), {
         algorithms: ["HS256"], issuer: "waveshare", audience: "waveshare",
       });
-      if (typeof payload.openId !== "string" || !/^github:\d+$/.test(payload.openId)) return null;
+      if (typeof payload.openId !== "string" || !payload.openId.startsWith("google:") || !payload.openId.slice(7).trim() || payload.openId.length > 64) return null;
       return { openId: payload.openId };
     } catch {
       return null;
