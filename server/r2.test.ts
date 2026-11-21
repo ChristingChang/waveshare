@@ -3,7 +3,7 @@ import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { appRouter } from "./routers.js";
 import { ENV } from "./_core/env.js";
-import { createSurfSession, deleteSurfSession, updateSurfSession, getUserRecentSessions, getUserAllSessions, getUserSessionsByDateRange, getSessionById } from "./db.js";
+import { createSurfSession, deleteSurfSession, updateSurfSession, getUserRecentSessions, getUserAllSessions, getUserSessionsByDateRange, getSessionById, isVideoPathReferenced } from "./db.js";
 import { deleteR2Video } from "./r2.js";
 import type { TrpcContext } from "./_core/context.js";
 import { reserveVideoUpload } from "./videoUploads.js";
@@ -12,7 +12,7 @@ vi.mock("./videoUploads.js", () => ({ reserveVideoUpload: vi.fn() }));
 
 vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl: vi.fn() }));
 vi.mock("./db.js", () => ({
-  createSurfSession: vi.fn(), deleteSurfSession: vi.fn(), updateSurfSession: vi.fn(), addSessionCompanions: vi.fn(),
+  createSurfSession: vi.fn(), deleteSurfSession: vi.fn(), updateSurfSession: vi.fn(), addSessionCompanions: vi.fn(), isVideoPathReferenced: vi.fn(),
   getUserRecentSessions: vi.fn(), getUserAllSessions: vi.fn(), getUserSessionsByDateRange: vi.fn(), getSessionById: vi.fn(),
 }));
 vi.mock("./_core/env.js", () => ({ ENV: {
@@ -28,6 +28,7 @@ const session = { date: "2025-11-21", spotName: "烏石港", waveQuality: 4, ...
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(isVideoPathReferenced).mockResolvedValue(false);
   vi.mocked(reserveVideoUpload).mockResolvedValue(undefined);
   vi.mocked(getSignedUrl).mockResolvedValue("https://signed.example.com/put");
   vi.mocked(createSurfSession).mockResolvedValue({ insertId: 1 } as never);
@@ -204,9 +205,32 @@ describe("R2 video deletion", () => {
     await expect(caller.surfSessions.delete({ id: 7 })).resolves.toEqual({ success: true });
     expect(getSessionById).toHaveBeenCalledWith(7, 42);
     expect(deleteSurfSession).toHaveBeenCalledWith(7, 42);
+    expect(isVideoPathReferenced).toHaveBeenCalledWith(videoPath);
+    expect(deleteSurfSession.mock.invocationCallOrder[0]).toBeLessThan(isVideoPathReferenced.mock.invocationCallOrder[0]);
     expect(send.mock.calls[0][0]).toBeInstanceOf(DeleteObjectCommand);
     expect((send.mock.calls[0][0] as DeleteObjectCommand).input).toEqual({ Bucket: "test-bucket", Key: videoPath });
     expect(destroy).toHaveBeenCalled();
+  });
+
+  it("keeps a shared R2 video when another session still references it", async () => {
+    const send = vi.spyOn(S3Client.prototype, "send");
+    vi.mocked(getSessionById).mockResolvedValueOnce(session as never);
+    vi.mocked(isVideoPathReferenced).mockResolvedValueOnce(true);
+    await expect(caller.surfSessions.delete({ id: 7 })).resolves.toEqual({ success: true });
+    expect(deleteSurfSession).toHaveBeenCalledWith(7, 42);
+    expect(isVideoPathReferenced).toHaveBeenCalledWith(videoPath);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("keeps the video and logs the error if checking remaining references fails", async () => {
+    const send = vi.spyOn(S3Client.prototype, "send");
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(getSessionById).mockResolvedValueOnce(session as never);
+    vi.mocked(isVideoPathReferenced).mockRejectedValueOnce(new Error("reference query failed"));
+    await expect(caller.surfSessions.delete({ id: 7 })).resolves.toEqual({ success: true });
+    expect(deleteSurfSession).toHaveBeenCalledWith(7, 42);
+    expect(send).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith("[R2] Failed to delete session video:", expect.any(Error));
   });
 
   it.each([
