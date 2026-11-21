@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { appRouter } from "./routers.js";
 import { ENV } from "./_core/env.js";
-import { createSurfSession, updateSurfSession, getUserRecentSessions, getUserAllSessions, getUserSessionsByDateRange, getSessionById } from "./db.js";
+import { createSurfSession, deleteSurfSession, updateSurfSession, getUserRecentSessions, getUserAllSessions, getUserSessionsByDateRange, getSessionById } from "./db.js";
+import { deleteR2Video } from "./r2.js";
 import type { TrpcContext } from "./_core/context.js";
 import { reserveVideoUpload } from "./videoUploads.js";
 
@@ -11,7 +12,7 @@ vi.mock("./videoUploads.js", () => ({ reserveVideoUpload: vi.fn() }));
 
 vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl: vi.fn() }));
 vi.mock("./db.js", () => ({
-  createSurfSession: vi.fn(), updateSurfSession: vi.fn(), addSessionCompanions: vi.fn(),
+  createSurfSession: vi.fn(), deleteSurfSession: vi.fn(), updateSurfSession: vi.fn(), addSessionCompanions: vi.fn(),
   getUserRecentSessions: vi.fn(), getUserAllSessions: vi.fn(), getUserSessionsByDateRange: vi.fn(), getSessionById: vi.fn(),
 }));
 vi.mock("./_core/env.js", () => ({ ENV: {
@@ -190,6 +191,65 @@ describe("R2 presigned uploads", () => {
         .rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR", message: expect.stringContaining("R2_PUBLIC_URL") });
       expect(getSignedUrl).not.toHaveBeenCalled();
     } finally { ENV.r2PublicUrl = original; }
+  });
+});
+
+describe("R2 video deletion", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("deletes the database session and its owner-scoped R2 object", async () => {
+    const send = vi.spyOn(S3Client.prototype, "send").mockImplementation(async () => ({}));
+    const destroy = vi.spyOn(S3Client.prototype, "destroy");
+    vi.mocked(getSessionById).mockResolvedValueOnce({ ...session, userId: 42 } as never);
+    await expect(caller.surfSessions.delete({ id: 7 })).resolves.toEqual({ success: true });
+    expect(getSessionById).toHaveBeenCalledWith(7, 42);
+    expect(deleteSurfSession).toHaveBeenCalledWith(7, 42);
+    expect(send.mock.calls[0][0]).toBeInstanceOf(DeleteObjectCommand);
+    expect((send.mock.calls[0][0] as DeleteObjectCommand).input).toEqual({ Bucket: "test-bucket", Key: videoPath });
+    expect(destroy).toHaveBeenCalled();
+  });
+
+  it.each([
+    "surf-videos/42/video-123-0123456789abcdef.mp4",
+    videoPath.replace("/42/", "/43/"),
+    "r2/surf-videos/42/../43/video-123-0123456789abcdef.mp4",
+    "",
+  ])("never sends a storage delete for an unsafe or Forge path: %s", async path => {
+    const send = vi.spyOn(S3Client.prototype, "send");
+    vi.mocked(getSessionById).mockResolvedValueOnce({ ...session, videoPath: path } as never);
+    await expect(caller.surfSessions.delete({ id: 7 })).resolves.toEqual({ success: true });
+    expect(send).not.toHaveBeenCalled();
+    expect(deleteSurfSession).toHaveBeenCalledWith(7, 42);
+  });
+
+  it("logs an R2 error without blocking session deletion and releases the client", async () => {
+    vi.spyOn(S3Client.prototype, "send").mockRejectedValueOnce(new Error("storage failed") as never);
+    const destroy = vi.spyOn(S3Client.prototype, "destroy");
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(getSessionById).mockResolvedValueOnce(session as never);
+    await expect(caller.surfSessions.delete({ id: 7 })).resolves.toEqual({ success: true });
+    expect(deleteSurfSession).toHaveBeenCalledWith(7, 42);
+    expect(log).toHaveBeenCalledWith("[R2] Failed to delete session video:", expect.any(Error));
+    expect(destroy).toHaveBeenCalled();
+  });
+
+  it("rejects an unknown session or database failure without deleting an object", async () => {
+    const send = vi.spyOn(S3Client.prototype, "send");
+    vi.mocked(getSessionById).mockResolvedValueOnce(undefined);
+    await expect(caller.surfSessions.delete({ id: 7 })).rejects.toThrow("Session not found");
+    vi.mocked(getSessionById).mockResolvedValueOnce(session as never);
+    vi.mocked(deleteSurfSession).mockRejectedValueOnce(new Error("database failed"));
+    await expect(caller.surfSessions.delete({ id: 7 })).rejects.toThrow("database failed");
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("requires credentials for R2 deletion but not a playback URL", async () => {
+    const original = ENV.r2Bucket;
+    ENV.r2Bucket = "";
+    try {
+      await expect(deleteR2Video(42, videoPath)).rejects.toThrow("not configured");
+      await expect(deleteR2Video(42, videoPath.replace("r2/", ""))).resolves.toBe(false);
+    } finally { ENV.r2Bucket = original; }
   });
 });
 

@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
@@ -39,6 +39,24 @@ export function validateVideoReference(userId: number, videoPath: string, videoU
   }
   if (videoUrl !== `${publicBaseUrl()}/${videoPath}`) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "影片網址與儲存路徑不符" });
+  }
+}
+
+export async function deleteR2Video(userId: number, videoPath: string): Promise<boolean> {
+  if (!isR2VideoPath(userId, videoPath)) return false;
+  if (!ENV.r2AccountId || !ENV.r2AccessKeyId || !ENV.r2SecretAccessKey || !ENV.r2Bucket) {
+    throw new Error("R2 video deletion is not configured");
+  }
+  const client = new S3Client({
+    endpoint: `https://${ENV.r2AccountId}.r2.cloudflarestorage.com`,
+    region: "auto",
+    credentials: { accessKeyId: ENV.r2AccessKeyId, secretAccessKey: ENV.r2SecretAccessKey },
+  });
+  try {
+    await client.send(new DeleteObjectCommand({ Bucket: ENV.r2Bucket, Key: videoPath }));
+    return true;
+  } finally {
+    client.destroy();
   }
 }
 
