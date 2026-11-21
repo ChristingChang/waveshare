@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { z } from "zod";
-import { MAX_VIDEO_SIZE, presignVideo, validateVideoReference } from "./r2.js";
+import { MAX_VIDEO_SIZE, presignVideo, validateVideoReference, withCurrentVideoUrl } from "./r2.js";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -31,13 +31,13 @@ export const appRouter = router({
     // Get recent sessions for home page
     getRecent: protectedProcedure.query(async ({ ctx }) => {
       const { getUserRecentSessions } = await import("./db.js");
-      return getUserRecentSessions(ctx.user.id, 3);
+      return (await getUserRecentSessions(ctx.user.id, 3)).map(withCurrentVideoUrl);
     }),
 
     // Get all sessions
     getAll: protectedProcedure.query(async ({ ctx }) => {
       const { getUserAllSessions } = await import("./db.js");
-      return getUserAllSessions(ctx.user.id);
+      return (await getUserAllSessions(ctx.user.id)).map(withCurrentVideoUrl);
     }),
 
     // Get sessions by date range (for calendar)
@@ -50,7 +50,7 @@ export const appRouter = router({
       )
       .query(async ({ ctx, input }) => {
         const { getUserSessionsByDateRange } = await import("./db.js");
-        return getUserSessionsByDateRange(ctx.user.id, input.startDate, input.endDate);
+        return (await getUserSessionsByDateRange(ctx.user.id, input.startDate, input.endDate)).map(withCurrentVideoUrl);
       }),
 
     // Get single session by ID
@@ -58,7 +58,8 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         const { getSessionById } = await import("./db.js");
-        return getSessionById(input.id, ctx.user.id);
+        const session = await getSessionById(input.id, ctx.user.id);
+        return session ? withCurrentVideoUrl(session) : session;
       }),
 
     // Create new session
