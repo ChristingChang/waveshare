@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "pnpm install && pnpm build",
+  "buildCommand": "pnpm build",
   "devCommand": "pnpm dev",
   "installCommand": "pnpm install",
   "framework": null,
-  "outputDirectory": "client/dist",
+  "outputDirectory": "dist/public",
   "env": {
     "NODE_VERSION": "22.13.0"
   },
@@ -14,7 +14,7 @@
     }
   },
   "functions": {
-    "server/_core/index.ts": {
+    "api/index.ts": {
       "memory": 1024,
       "maxDuration": 10
     }
@@ -22,7 +22,11 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/server/_core/index.ts"
+      "destination": "/api"
+    },
+    {
+      "source": "/((?!api(?:/|$))[^.]*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [

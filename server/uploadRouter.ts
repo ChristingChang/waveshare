@@ -1,8 +1,8 @@
 import { Router } from "express";
 import multer from "multer";
-import { storagePut } from "./storage";
+import { storagePut } from "./storage.js";
 import { randomBytes } from "crypto";
-import { sdk } from "./_core/sdk";
+import { sdk } from "./_core/sdk.js";
 
 function getVideoExtension(buffer: Buffer): string | undefined {
   if (buffer.length >= 12 && buffer.toString("ascii", 4, 8) === "ftyp") {

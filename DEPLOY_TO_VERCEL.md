@@ -55,8 +55,8 @@ Vercel 是專為前端框架與全端應用程式設計的雲端平台,提供以
    |---------|---|------|
    | **Framework Preset** | Other | 因為是自訂全端架構 |
    | **Root Directory** | `./` | 專案根目錄 |
-   | **Build Command** | `pnpm install && pnpm build` | 建置命令 |
-   | **Output Directory** | `dist` | 輸出目錄 |
+   | **Build Command** | `pnpm build` | 建置命令 |
+   | **Output Directory** | `dist/public` | Vite 靜態前端輸出目錄 |
    | **Install Command** | `pnpm install` | 安裝命令 |
 
 3. **不要立即部署**
@@ -155,45 +155,38 @@ Vercel 已自動設定 GitHub 整合,每次推送程式碼時會自動觸發部�
 
 ## Vercel 專案配置檔
 
-為了確保部署順利,建議在專案根目錄建立 `vercel.json` 配置檔:
+專案已包含 `vercel.json`。主要設定如下（安全標頭保留在實際檔案中）:
 
 ```json
 {
   "version": 2,
-  "builds": [
+  "buildCommand": "pnpm build",
+  "installCommand": "pnpm install",
+  "framework": null,
+  "outputDirectory": "dist/public",
+  "functions": {
+    "api/index.ts": { "memory": 1024, "maxDuration": 10 }
+  },
+  "rewrites": [
     {
-      "src": "server/_core/index.ts",
-      "use": "@vercel/node"
+      "source": "/api/(.*)",
+      "destination": "/api"
     },
     {
-      "src": "client/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+      "source": "/((?!api(?:/|$))[^.]*)",
+      "destination": "/index.html"
     }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "server/_core/index.ts"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "client/dist/$1"
-    }
-  ],
-  "env": {
-    "NODE_VERSION": "22.13.0"
-  }
+  ]
 }
 ```
 
 **配置說明:**
 
-- **builds** - 定義建置目標,包含 Node.js 後端與靜態前端
-- **routes** - 路由規則,`/api/*` 導向後端,其他導向前端
-- **env** - 指定 Node.js 版本,確保與開發環境一致
+- **outputDirectory** - `pnpm build` 產生的 `dist/public` 由 Vercel 靜態託管。
+- **functions** - `api/index.ts` 匯出 Express app，不呼叫 listen；共用 `server/_core/app.ts` 的 OAuth、上傳與 tRPC 路由。
+- **rewrites** - `/api/*` 導向 Node function 並保留原始請求路徑；非檔案的 SPA 路徑回傳 `index.html`，靜態資源不改寫。
+- 在 Vercel Project Settings 選擇支援的 Node.js 版本（例如 22.x）；`NODE_VERSION` 環境變數不是 runtime 版本設定。
+- `pnpm dev` / `pnpm start` 仍透過 `server/_core/index.ts` 啟動本機 Node server，不用作 Vercel function entry。
 
 ## 資料庫設定
 
@@ -290,12 +283,13 @@ pnpm db:push
 **可能原因與解決方案:**
 
 1. **檔案大小限制**
-   - Vercel Serverless Functions 有 50MB 請求大小限制
-   - 建議使用客戶端直接上傳到 S3,而非透過後端
+   - Vercel Node Functions 的 request body 上限約 **4.5 MB**（包含 multipart 開銷）；超限請求會在進入 Express 前被拒絕。
+   - 應用程式的 Multer 100 MiB 限制仍適用於獨立 Node 部署，但無法突破 Vercel 平台限制。
+   - 此部署只能透過現有路由上傳小於平台限制的影片。大型影片需另行設計直接上傳流程，或改用獨立 Node 託管；目前未實作直接上傳。
 
-2. **S3 憑證未設定**
-   - 確認 S3 相關的環境變數已設定
-   - 檢查 S3 bucket 的 CORS 設定
+2. **Storage proxy 憑證未設定**
+   - 設定 `BUILT_IN_FORGE_API_URL` 與 `BUILT_IN_FORGE_API_KEY`。
+   - 上傳需要有效的登入 Cookie；未登入時會回傳 401。
 
 ### Q5: 部署後資料庫是空的
 
@@ -313,16 +307,9 @@ pnpm db:push
 
 ## 效能優化建議
 
-### 1. 啟用 Edge Functions
+### 1. 使用 Node Functions
 
-Vercel Edge Functions 在全球邊緣節點執行,大幅降低延遲:
-
-```typescript
-// server/_core/index.ts
-export const config = {
-  runtime: 'edge',
-};
-```
+本專案使用 Express、Multer 與 mysql2，必須使用 Node runtime，不可將 function 切換為 Edge runtime。
 
 ### 2. 設定快取策略
 
@@ -385,7 +372,7 @@ import Image from 'next/image';
 # 安裝 Sentry
 pnpm add @sentry/node @sentry/react
 
-# 在 server/_core/index.ts 初始化
+# 在共用 server/_core/app.ts 初始化
 import * as Sentry from "@sentry/node";
 
 Sentry.init({
@@ -423,7 +410,7 @@ Vercel 自動為所有網域啟用 HTTPS,並強制重導向。
 
 ### 3. CORS 設定
 
-在 `server/_core/index.ts` 中設定 CORS:
+若需 CORS，應在共用的 `server/_core/app.ts` 中設定，使本機與 Vercel 使用相同設定:
 
 ```typescript
 app.use(cors({

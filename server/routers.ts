@@ -1,7 +1,7 @@
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { COOKIE_NAME } from "../shared/const.js";
+import { getSessionCookieOptions } from "./_core/cookies.js";
+import { systemRouter } from "./_core/systemRouter.js";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { z } from "zod";
 
 export const appRouter = router({
@@ -22,13 +22,13 @@ export const appRouter = router({
   surfSessions: router({
     // Get recent sessions for home page
     getRecent: protectedProcedure.query(async ({ ctx }) => {
-      const { getUserRecentSessions } = await import("./db");
+      const { getUserRecentSessions } = await import("./db.js");
       return getUserRecentSessions(ctx.user.id, 3);
     }),
 
     // Get all sessions
     getAll: protectedProcedure.query(async ({ ctx }) => {
-      const { getUserAllSessions } = await import("./db");
+      const { getUserAllSessions } = await import("./db.js");
       return getUserAllSessions(ctx.user.id);
     }),
 
@@ -41,7 +41,7 @@ export const appRouter = router({
         })
       )
       .query(async ({ ctx, input }) => {
-        const { getUserSessionsByDateRange } = await import("./db");
+        const { getUserSessionsByDateRange } = await import("./db.js");
         return getUserSessionsByDateRange(ctx.user.id, input.startDate, input.endDate);
       }),
 
@@ -49,7 +49,7 @@ export const appRouter = router({
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        const { getSessionById } = await import("./db");
+        const { getSessionById } = await import("./db.js");
         return getSessionById(input.id, ctx.user.id);
       }),
 
@@ -70,7 +70,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const { createSurfSession, addSessionCompanions } = await import("./db");
+        const { createSurfSession, addSessionCompanions } = await import("./db.js");
         const { companionIds, ...sessionData } = input;
         
         const result = await createSurfSession({
@@ -102,7 +102,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         const { id, companionIds, ...updates } = input;
-        const { updateSurfSession } = await import("./db");
+        const { updateSurfSession } = await import("./db.js");
         
         const result = await updateSurfSession(id, ctx.user.id, updates);
         
@@ -116,7 +116,7 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const { deleteSurfSession, getSessionById } = await import("./db");
+        const { deleteSurfSession, getSessionById } = await import("./db.js");
         
         // Get session to retrieve video path for deletion
         const session = await getSessionById(input.id, ctx.user.id);
@@ -128,7 +128,7 @@ export const appRouter = router({
         await deleteSurfSession(input.id, ctx.user.id);
         
         // TODO: Delete video from S3 storage
-        // const { storageDelete } = await import("./storage");
+        // const { storageDelete } = await import("./storage.js");
         // await storageDelete(session.videoPath);
         
         return { success: true };
@@ -136,19 +136,19 @@ export const appRouter = router({
 
     // Get user statistics
     getStats: protectedProcedure.query(async ({ ctx }) => {
-      const { getUserStats } = await import("./db");
+      const { getUserStats } = await import("./db.js");
       return getUserStats(ctx.user.id);
     }),
 
     // Get spot names for autocomplete
     getSpotNames: protectedProcedure.query(async ({ ctx }) => {
-      const { getSpotNames } = await import("./db");
+      const { getSpotNames } = await import("./db.js");
       return getSpotNames(ctx.user.id);
     }),
 
     // Get board type statistics
     getBoardTypeStats: protectedProcedure.query(async ({ ctx }) => {
-      const { getBoardTypeStats } = await import("./db");
+      const { getBoardTypeStats } = await import("./db.js");
       return getBoardTypeStats(ctx.user.id);
     }),
   }),
@@ -159,7 +159,7 @@ export const appRouter = router({
     search: protectedProcedure
       .input(z.object({ query: z.string().min(1) }))
       .query(async ({ ctx, input }) => {
-        const { searchUsers } = await import("./db");
+        const { searchUsers } = await import("./db.js");
         return searchUsers(input.query, ctx.user.id);
       }),
 
@@ -167,7 +167,7 @@ export const appRouter = router({
     sendRequest: protectedProcedure
       .input(z.object({ friendId: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const { sendFriendRequest } = await import("./db");
+        const { sendFriendRequest } = await import("./db.js");
         return sendFriendRequest(ctx.user.id, input.friendId);
       }),
 
@@ -175,7 +175,7 @@ export const appRouter = router({
     acceptRequest: protectedProcedure
       .input(z.object({ requestId: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const { acceptFriendRequest } = await import("./db");
+        const { acceptFriendRequest } = await import("./db.js");
         return acceptFriendRequest(input.requestId, ctx.user.id);
       }),
 
@@ -183,19 +183,19 @@ export const appRouter = router({
     rejectRequest: protectedProcedure
       .input(z.object({ requestId: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const { rejectFriendRequest } = await import("./db");
+        const { rejectFriendRequest } = await import("./db.js");
         return rejectFriendRequest(input.requestId, ctx.user.id);
       }),
 
     // Get friends list
     getFriends: protectedProcedure.query(async ({ ctx }) => {
-      const { getUserFriends } = await import("./db");
+      const { getUserFriends } = await import("./db.js");
       return getUserFriends(ctx.user.id);
     }),
 
     // Get pending requests
     getPendingRequests: protectedProcedure.query(async ({ ctx }) => {
-      const { getPendingRequests } = await import("./db");
+      const { getPendingRequests } = await import("./db.js");
       return getPendingRequests(ctx.user.id);
     }),
   }),

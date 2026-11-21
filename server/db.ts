@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import { InsertUser, users } from "../drizzle/schema.js";
+import { ENV } from './_core/env.js';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -98,7 +98,7 @@ export async function getUserRecentSessions(userId: number, limit: number = 3) {
   const db = await getDb();
   if (!db) return [];
   
-  const { surfSessions } = await import("../drizzle/schema");
+  const { surfSessions } = await import("../drizzle/schema.js");
   const result = await db
     .select()
     .from(surfSessions)
@@ -114,7 +114,7 @@ export async function getUserAllSessions(userId: number) {
   const db = await getDb();
   if (!db) return [];
   
-  const { surfSessions } = await import("../drizzle/schema");
+  const { surfSessions } = await import("../drizzle/schema.js");
   const result = await db
     .select()
     .from(surfSessions)
@@ -133,7 +133,7 @@ export async function getUserSessionsByDateRange(
   const db = await getDb();
   if (!db) return [];
   
-  const { surfSessions } = await import("../drizzle/schema");
+  const { surfSessions } = await import("../drizzle/schema.js");
   const { and, gte, lte } = await import("drizzle-orm");
   
   const result = await db
@@ -156,7 +156,7 @@ export async function getSessionById(sessionId: number, userId: number) {
   const db = await getDb();
   if (!db) return undefined;
   
-  const { surfSessions } = await import("../drizzle/schema");
+  const { surfSessions } = await import("../drizzle/schema.js");
   const { and } = await import("drizzle-orm");
   
   const result = await db
@@ -189,7 +189,7 @@ export async function createSurfSession(session: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const { surfSessions } = await import("../drizzle/schema");
+  const { surfSessions } = await import("../drizzle/schema.js");
   
   const result = await db.insert(surfSessions).values(session);
   return result;
@@ -212,7 +212,7 @@ export async function updateSurfSession(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const { surfSessions } = await import("../drizzle/schema");
+  const { surfSessions } = await import("../drizzle/schema.js");
   const { and } = await import("drizzle-orm");
   
   const result = await db
@@ -233,7 +233,7 @@ export async function getBoardTypeStats(userId: number) {
   const db = await getDb();
   if (!db) return [];
   
-  const { surfSessions } = await import("../drizzle/schema");
+  const { surfSessions } = await import("../drizzle/schema.js");
   const { sql } = await import("drizzle-orm");
   
   const result = await db
@@ -258,7 +258,7 @@ export async function sendFriendRequest(userId: number, friendId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const { friendships } = await import("../drizzle/schema");
+  const { friendships } = await import("../drizzle/schema.js");
   
   // Check if friendship already exists
   const { or, and } = await import("drizzle-orm");
@@ -291,7 +291,7 @@ export async function acceptFriendRequest(requestId: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const { friendships } = await import("../drizzle/schema");
+  const { friendships } = await import("../drizzle/schema.js");
   const { and } = await import("drizzle-orm");
   
   const result = await db
@@ -313,7 +313,7 @@ export async function rejectFriendRequest(requestId: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const { friendships } = await import("../drizzle/schema");
+  const { friendships } = await import("../drizzle/schema.js");
   const { and } = await import("drizzle-orm");
   
   const result = await db
@@ -335,7 +335,7 @@ export async function getUserFriends(userId: number) {
   const db = await getDb();
   if (!db) return [];
   
-  const { friendships, users } = await import("../drizzle/schema");
+  const { friendships, users } = await import("../drizzle/schema.js");
   const { or, and } = await import("drizzle-orm");
   
   const result = await db
@@ -379,7 +379,7 @@ export async function getPendingRequests(userId: number) {
   const db = await getDb();
   if (!db) return [];
   
-  const { friendships, users } = await import("../drizzle/schema");
+  const { friendships, users } = await import("../drizzle/schema.js");
   const { and } = await import("drizzle-orm");
   
   const result = await db
@@ -407,7 +407,7 @@ export async function searchUsers(query: string, currentUserId: number) {
   const db = await getDb();
   if (!db) return [];
   
-  const { users } = await import("../drizzle/schema");
+  const { users } = await import("../drizzle/schema.js");
   const { or, and, like, ne } = await import("drizzle-orm");
   
   const searchPattern = `%${query}%`;
@@ -444,7 +444,7 @@ export async function addSessionCompanions(sessionId: number, companionIds: numb
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const { sessionCompanions } = await import("../drizzle/schema");
+  const { sessionCompanions } = await import("../drizzle/schema.js");
   
   const values = companionIds.map(companionId => ({
     sessionId,
@@ -459,7 +459,7 @@ export async function removeSessionCompanions(sessionId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const { sessionCompanions } = await import("../drizzle/schema");
+  const { sessionCompanions } = await import("../drizzle/schema.js");
   
   await db.delete(sessionCompanions).where(eq(sessionCompanions.sessionId, sessionId));
 }
@@ -469,7 +469,7 @@ export async function getSessionCompanions(sessionId: number) {
   const db = await getDb();
   if (!db) return [];
   
-  const { sessionCompanions, users } = await import("../drizzle/schema");
+  const { sessionCompanions, users } = await import("../drizzle/schema.js");
   
   const result = await db
     .select({
@@ -490,7 +490,7 @@ export async function deleteSurfSession(sessionId: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const { surfSessions } = await import("../drizzle/schema");
+  const { surfSessions } = await import("../drizzle/schema.js");
   const { and } = await import("drizzle-orm");
   
   const result = await db
@@ -510,7 +510,7 @@ export async function getUserStats(userId: number) {
   const db = await getDb();
   if (!db) return { totalSessions: 0, uniqueSpots: 0, avgWaveQuality: 0 };
   
-  const { surfSessions } = await import("../drizzle/schema");
+  const { surfSessions } = await import("../drizzle/schema.js");
   const { count, avg, countDistinct, sql } = await import("drizzle-orm");
   
   const result = await db
@@ -530,7 +530,7 @@ export async function getSpotNames(userId: number) {
   const db = await getDb();
   if (!db) return [];
   
-  const { surfSessions } = await import("../drizzle/schema");
+  const { surfSessions } = await import("../drizzle/schema.js");
   const { sql } = await import("drizzle-orm");
   
   const result = await db
