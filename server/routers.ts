@@ -3,6 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { z } from "zod";
+import { MAX_VIDEO_SIZE, presignVideo, validateVideoReference } from "./r2.js";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -20,6 +21,13 @@ export const appRouter = router({
 
   // Surf sessions router
   surfSessions: router({
+    presignUpload: protectedProcedure
+      .input(z.object({
+        contentType: z.enum(["video/mp4", "video/quicktime", "video/webm"]),
+        size: z.number().int().positive().max(MAX_VIDEO_SIZE),
+      }))
+      .mutation(({ ctx, input }) => presignVideo(ctx.user.id, input.contentType, input.size)),
+
     // Get recent sessions for home page
     getRecent: protectedProcedure.query(async ({ ctx }) => {
       const { getUserRecentSessions } = await import("./db.js");
@@ -70,6 +78,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        validateVideoReference(ctx.user.id, input.videoPath, input.videoUrl);
         const { createSurfSession, addSessionCompanions } = await import("./db.js");
         const { companionIds, ...sessionData } = input;
         
@@ -90,6 +99,8 @@ export const appRouter = router({
       .input(
         z.object({
           id: z.number(),
+          videoPath: z.string().optional(),
+          videoUrl: z.string().optional(),
           date: z.string().optional(),
           spotName: z.string().optional(),
           spotLat: z.string().optional(),
@@ -98,10 +109,15 @@ export const appRouter = router({
           boardType: z.string().optional(),
           waveQuality: z.number().min(1).max(5).optional(),
           companionIds: z.array(z.number()).optional(),
+        }).refine(data => (data.videoPath === undefined) === (data.videoUrl === undefined), {
+          message: "請同時提供影片網址與路徑",
         })
       )
       .mutation(async ({ ctx, input }) => {
         const { id, companionIds, ...updates } = input;
+        if (input.videoPath !== undefined && input.videoUrl !== undefined) {
+          validateVideoReference(ctx.user.id, input.videoPath, input.videoUrl);
+        }
         const { updateSurfSession } = await import("./db.js");
         
         const result = await updateSurfSession(id, ctx.user.id, updates);

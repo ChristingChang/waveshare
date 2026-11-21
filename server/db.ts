@@ -200,6 +200,8 @@ export async function updateSurfSession(
   sessionId: number,
   userId: number,
   updates: {
+    videoPath?: string;
+    videoUrl?: string;
     date?: string;
     spotName?: string;
     spotLat?: string;
