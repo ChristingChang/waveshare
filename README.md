@@ -102,6 +102,12 @@ pnpm test
 
 執行 Vitest 單元測試,驗證核心功能正常運作。
 
+## Vercel 部署
+
+使用專案根目錄的 `vercel.json`：`pnpm build` 產生 `dist/public`，Vercel 託管靜態前端，非檔案的 SPA 路徑回傳 `index.html`。`/api/*` 由 `api/index.ts` 匯出的 Express app 處理，共用 `server/_core/app.ts` 的 OAuth、上傳與 tRPC 路由；不會啟動本機監聽器。`pnpm dev` / `pnpm start` 的本機 Node server 行為不變。
+
+**上傳限制：** Vercel Node Functions 的 request body 上限約 **4.5 MB**（含 multipart 開銷），會先於應用程式的 100 MiB 限制生效。現有路由無法在 Vercel 接收大型影片；直接上傳尚未實作。詳見 [部署指南](DEPLOY_TO_VERCEL.md)。
+
 ## 專案結構
 
 ```
