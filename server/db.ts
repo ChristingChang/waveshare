@@ -200,6 +200,8 @@ export async function updateSurfSession(
   sessionId: number,
   userId: number,
   updates: {
+    videoPath?: string;
+    videoUrl?: string;
     date?: string;
     spotName?: string;
     spotLat?: string;
@@ -503,6 +505,17 @@ export async function deleteSurfSession(sessionId: number, userId: number) {
     );
   
   return result;
+}
+
+export async function isVideoPathReferenced(videoPath: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { surfSessions } = await import("../drizzle/schema.js");
+  const matches = await db.select({ id: surfSessions.id })
+    .from(surfSessions)
+    .where(eq(surfSessions.videoPath, videoPath))
+    .limit(1);
+  return matches.length > 0;
 }
 
 // Get user statistics

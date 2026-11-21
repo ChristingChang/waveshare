@@ -1,0 +1,60 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MySqlDialect } from "drizzle-orm/mysql-core";
+import { getDb } from "./db.js";
+import { DAILY_UPLOAD_LIMIT, reserveVideoUpload } from "./videoUploads.js";
+import { users, videoUploads } from "../drizzle/schema.js";
+
+vi.mock("./db.js", () => ({ getDb: vi.fn() }));
+
+const lock = vi.fn();
+const where = vi.fn(() => ({ for: lock }));
+const from = vi.fn(() => ({ where }));
+const select = vi.fn(() => ({ from }));
+const values = vi.fn();
+const insert = vi.fn(() => ({ values }));
+const tx = { select, insert };
+const transaction = vi.fn(async (run: (value: typeof tx) => unknown) => run(tx));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  lock.mockReset();
+  values.mockReset();
+  vi.mocked(getDb).mockResolvedValue({ transaction } as never);
+});
+
+describe("rolling upload reservations", () => {
+  it("records an upload without requiring a session, after locking the user and recent rows", async () => {
+    lock.mockResolvedValueOnce([{ id: 42 }]).mockResolvedValueOnce([]);
+    await reserveVideoUpload(42, "r2/surf-videos/42/video-123-0123456789abcdef.mp4");
+    expect(from.mock.calls.map(call => call[0])).toEqual([users, videoUploads]);
+    expect(lock.mock.calls).toEqual([["update"], ["update"]]);
+    const query = new MySqlDialect().sqlToQuery(where.mock.calls[1][0]);
+    expect(query.sql).toContain("DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)");
+    expect(query.sql).toContain("`video_uploads`.`userId` = ?");
+    expect(query.params).toEqual([42]);
+    expect(values).toHaveBeenCalledWith({ userId: 42, videoPath: "r2/surf-videos/42/video-123-0123456789abcdef.mp4" });
+  });
+
+  it("allows the tenth reservation and rejects the next without inserting", async () => {
+    lock.mockResolvedValueOnce([{ id: 42 }]).mockResolvedValueOnce(Array.from({ length: DAILY_UPLOAD_LIMIT - 1 }, (_, id) => ({ id })));
+    await reserveVideoUpload(42, "tenth");
+    expect(values).toHaveBeenCalledTimes(1);
+    lock.mockResolvedValueOnce([{ id: 42 }]).mockResolvedValueOnce(Array.from({ length: DAILY_UPLOAD_LIMIT }, (_, id) => ({ id })));
+    await expect(reserveVideoUpload(42, "eleventh")).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS", message: expect.stringContaining("影片") });
+    expect(values).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed if the database or authenticated user is unavailable", async () => {
+    vi.mocked(getDb).mockResolvedValueOnce(null);
+    await expect(reserveVideoUpload(42, "unused")).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+    lock.mockResolvedValueOnce([]);
+    await expect(reserveVideoUpload(42, "unused")).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("propagates insertion errors rather than allowing an unrecorded presign", async () => {
+    lock.mockResolvedValueOnce([{ id: 42 }]).mockResolvedValueOnce([]);
+    values.mockRejectedValueOnce(new Error("insert failed"));
+    await expect(reserveVideoUpload(42, "unused")).rejects.toThrow("insert failed");
+  });
+});

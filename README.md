@@ -39,7 +39,7 @@
 - **tRPC 11** - 型別安全的 RPC 框架
 - **Drizzle ORM** - TypeScript ORM,支援 MySQL/TiDB
 - **Manus OAuth** - 整合式使用者認證系統
-- **Multer** - 檔案上傳中介軟體
+- **Cloudflare R2 / AWS SDK** - 短效預簽網址，瀏覽器直接上傳影片
 
 ### 資料庫設計
 使用 MySQL/TiDB 儲存結構化資料,主要資料表包含:
@@ -82,8 +82,8 @@ cp .env.example .env
 - `DATABASE_URL` - MySQL/TiDB 連線字串
 - `JWT_SECRET` - Session 加密金鑰(請使用強密碼)
 - `VITE_APP_ID` - Manus OAuth 應用程式 ID
-- `BUILT_IN_FORGE_API_KEY` - Manus 後端 API 金鑰
-- `VITE_FRONTEND_FORGE_API_KEY` - Manus 前端 API 金鑰
+- `OAUTH_SERVER_URL`、`VITE_OAUTH_PORTAL_URL` - Manus OAuth 服務與登入入口
+- `R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_URL` - 影片儲存；請依 [R2 設定教學](docs/R2_SETUP.zh-TW.md) 操作。R2 變數僅限伺服器，不要加 `VITE_` 前綴。
 
 4. **初始化資料庫**
 ```bash
@@ -108,7 +108,7 @@ pnpm test
 
 使用專案根目錄的 `vercel.json`：`pnpm build` 產生 `dist/public`，Vercel 託管靜態前端，非檔案的 SPA 路徑回傳 `index.html`。`/api/*` 由 `api/index.ts` 匯出的 Express app 處理，共用 `server/_core/app.ts` 的 OAuth、上傳與 tRPC 路由；不會啟動本機監聽器。`pnpm dev` / `pnpm start` 的本機 Node server 行為不變。
 
-**上傳限制：** Vercel Node Functions 的 request body 上限約 **4.5 MB**（含 multipart 開銷），會先於應用程式的 100 MiB 限制生效。現有路由無法在 Vercel 接收大型影片；直接上傳尚未實作。詳見 [部署指南](DEPLOY_TO_VERCEL.md)。
+**影片直接上傳：** 登入後先由 tRPC 取得 10 分鐘有效的 R2 預簽 PUT 網址，再由瀏覽器直接上傳 MP4、MOV 或 WebM（最多 100 MiB）。影片不經 Vercel function，因此不受其約 4.5 MB body 限制；舊 `/api/upload-video` 路由已移除。公開播放網址的影片可被知道網址的人觀看。詳見 [R2 設定教學](docs/R2_SETUP.zh-TW.md) 與 [部署指南](DEPLOY_TO_VERCEL.md)。
 
 ## 專案結構
 
@@ -139,7 +139,7 @@ waveshare/
 - **環境變數隔離** - 所有敏感資訊(API 金鑰、資料庫密碼)儲存於 `.env` 檔案,並已加入 `.gitignore` 防止意外提交
 - **JWT Session 管理** - 使用 HttpOnly Cookie 儲存 Session,防止 XSS 攻擊
 - **tRPC 權限控制** - `protectedProcedure` 確保所有 API 呼叫都經過身份驗證
-- **檔案上傳限制** - Multer 設定檔案大小限制,防止濫用
+- **影片上傳限制** - 登入後驗證申報格式與大小，簽發限定使用者路徑、Content-Type 與 Content-Length 的短效 R2 PUT 網址；非影片內容掃描
 - **SQL Injection 防護** - Drizzle ORM 自動參數化查詢,避免 SQL 注入攻擊
 
 ### 部署前檢查清單
