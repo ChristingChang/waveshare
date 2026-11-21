@@ -3,6 +3,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
 import { ENV } from "./_core/env.js";
+import { reserveVideoUpload } from "./videoUploads.js";
 
 export const VIDEO_TYPES = {
   "video/mp4": "mp4",
@@ -47,6 +48,7 @@ export async function presignVideo(userId: number, contentType: keyof typeof VID
   }
   const baseUrl = publicBaseUrl();
   const videoPath = `r2/surf-videos/${userId}/video-${Date.now()}-${randomBytes(8).toString("hex")}.${VIDEO_TYPES[contentType]}`;
+  await reserveVideoUpload(userId, videoPath);
   const client = new S3Client({
     endpoint: `https://${ENV.r2AccountId}.r2.cloudflarestorage.com`,
     region: "auto",
