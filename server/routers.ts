@@ -133,7 +133,7 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const { deleteSurfSession, getSessionById } = await import("./db.js");
+        const { deleteSurfSession, getSessionById, isVideoPathReferenced } = await import("./db.js");
         
         // Get session to retrieve video path for deletion
         const session = await getSessionById(input.id, ctx.user.id);
@@ -145,7 +145,9 @@ export const appRouter = router({
         await deleteSurfSession(input.id, ctx.user.id);
         
         try {
-          await deleteR2Video(ctx.user.id, session.videoPath);
+          if (!await isVideoPathReferenced(session.videoPath)) {
+            await deleteR2Video(ctx.user.id, session.videoPath);
+          }
         } catch (error) {
           console.error("[R2] Failed to delete session video:", error);
         }
