@@ -19,7 +19,7 @@ describe("MySQL and TiDB TLS configuration", () => {
     { host: "gateway.tidbcloud.com.evil.example", flag: undefined, tls: false },
   ])("applies the shared TLS rule for $host ($flag)", ({ host, flag, tls }) => {
     const config = databaseConfig(`mysql://user:password@${host}/waveshare`, flag);
-    expect(config.ssl).toEqual(tls ? { minVersion: "TLSv1.2", rejectUnauthorized: true } : undefined);
+    expect(config.ssl).toEqual(tls ? { minVersion: "TLSv1.2", rejectUnauthorized: true, verifyIdentity: true } : undefined);
   });
 
   it("decodes URL credentials without losing special characters", () => {
@@ -50,7 +50,7 @@ describe("serverless database pool", () => {
     expect(await getDb()).toBe(db);
     expect(await getDb()).toBe(db);
     expect(createPool).toHaveBeenCalledOnce();
-    expect(createPool).toHaveBeenCalledWith(expect.objectContaining({ connectionLimit: 3, ssl: { minVersion: "TLSv1.2", rejectUnauthorized: true } }));
+    expect(createPool).toHaveBeenCalledWith(expect.objectContaining({ connectionLimit: 3, ssl: { minVersion: "TLSv1.2", rejectUnauthorized: true, verifyIdentity: true } }));
     expect(drizzle).toHaveBeenCalledWith(pool);
   });
 
