@@ -409,13 +409,13 @@ export async function getPendingRequests(userId: number) {
   return result;
 }
 
-// Search users by name or email
+// Search users by name
 export async function searchUsers(query: string, currentUserId: number) {
   const db = await getDb();
   if (!db) return [];
   
   const { users } = await import("../drizzle/schema.js");
-  const { or, and, like, ne } = await import("drizzle-orm");
+  const { and, like, ne } = await import("drizzle-orm");
   
   const searchPattern = `%${query}%`;
   
@@ -423,15 +423,11 @@ export async function searchUsers(query: string, currentUserId: number) {
     .select({
       id: users.id,
       name: users.name,
-      email: users.email,
     })
     .from(users)
     .where(
       and(
-        or(
-          like(users.name, searchPattern),
-          like(users.email, searchPattern)
-        ),
+        like(users.name, searchPattern),
         ne(users.id, currentUserId)
       )
     )
