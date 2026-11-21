@@ -21,9 +21,19 @@ function publicBaseUrl() {
   }
 }
 
-export function validateVideoReference(userId: number, videoPath: string, videoUrl: string) {
+function isR2VideoPath(userId: number, videoPath: string) {
   const prefix = `surf-videos/${userId}/`;
-  if (!videoPath.startsWith(prefix) || !/^video-\d+-[a-f0-9]{16}\.(mp4|mov|webm)$/.test(videoPath.slice(prefix.length))) {
+  return videoPath.startsWith(prefix) && /^video-\d+-[a-f0-9]{16}\.(mp4|mov|webm)$/.test(videoPath.slice(prefix.length));
+}
+
+export function withCurrentVideoUrl<T extends { userId: number; videoPath: string; videoUrl: string }>(session: T): T {
+  return isR2VideoPath(session.userId, session.videoPath)
+    ? { ...session, videoUrl: `${publicBaseUrl()}/${session.videoPath}` }
+    : session;
+}
+
+export function validateVideoReference(userId: number, videoPath: string, videoUrl: string) {
+  if (!isR2VideoPath(userId, videoPath)) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "影片路徑不屬於您的帳號或格式不正確" });
   }
   if (videoUrl !== `${publicBaseUrl()}/${videoPath}`) {
