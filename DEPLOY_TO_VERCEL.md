@@ -76,12 +76,13 @@ Vercel 是專為前端框架與全端應用程式設計的雲端平台,提供以
 | `VITE_APP_ID` | Manus OAuth 應用程式 ID | 從 Manus 平台取得 |
 | `OAUTH_SERVER_URL` | Manus OAuth 伺服器 URL | `https://api.manus.im` |
 | `VITE_OAUTH_PORTAL_URL` | Manus 登入入口 URL | `https://auth.manus.im` |
-| `OWNER_OPEN_ID` | 專案擁有者 Open ID | 從 Manus 平台取得 |
-| `OWNER_NAME` | 專案擁有者名稱 | 您的名稱 |
-| `BUILT_IN_FORGE_API_URL` | Manus Forge API URL | `https://forge.manus.im` |
-| `BUILT_IN_FORGE_API_KEY` | Manus 後端 API 金鑰 | 從 Manus 平台取得 |
-| `VITE_FRONTEND_FORGE_API_KEY` | Manus 前端 API 金鑰 | 從 Manus 平台取得 |
-| `VITE_FRONTEND_FORGE_API_URL` | Manus Forge API URL(前端) | `https://forge.manus.im` |
+| `R2_ACCOUNT_ID` | Cloudflare 帳號 ID | 請依 R2 教學取得 |
+| `R2_ACCESS_KEY_ID` | R2 Access Key ID | 僅限伺服器 |
+| `R2_SECRET_ACCESS_KEY` | R2 Secret Access Key | 僅限伺服器 |
+| `R2_BUCKET` | 影片 bucket 名稱 | `waveshare-videos` |
+| `R2_PUBLIC_URL` | 公開播放 HTTPS 網址 | 您的 r2.dev 或自訂網域 |
+
+請先完成 [R2 設定教學](docs/R2_SETUP.zh-TW.md) 的公開網址、CORS 與 bucket 權限設定。`OWNER_OPEN_ID` 是選用管理員設定；Forge 變數只供通知、AI 等模板服務，不再用於影片上傳。
 
 #### 選用環境變數
 
@@ -282,14 +283,14 @@ pnpm db:push
 
 **可能原因與解決方案:**
 
-1. **檔案大小限制**
-   - Vercel Node Functions 的 request body 上限約 **4.5 MB**（包含 multipart 開銷）；超限請求會在進入 Express 前被拒絕。
-   - 應用程式的 Multer 100 MiB 限制仍適用於獨立 Node 部署，但無法突破 Vercel 平台限制。
-   - 此部署只能透過現有路由上傳小於平台限制的影片。大型影片需另行設計直接上傳流程，或改用獨立 Node 託管；目前未實作直接上傳。
+1. **直接上傳設定**
+   - 瀏覽器取得短效網址後直接 PUT 到 R2；影片不經 Vercel，因此不受其約 4.5 MB body 限制。舊 `/api/upload-video` 已移除。
+   - 只接受 MP4、MOV、WebM，申報大小須為 1 byte 至 100 MiB。
+   - 確認 bucket CORS 已允許您的網站來源與 `Content-Type`，以及登入狀態有效。
 
-2. **Storage proxy 憑證未設定**
-   - 設定 `BUILT_IN_FORGE_API_URL` 與 `BUILT_IN_FORGE_API_KEY`。
-   - 上傳需要有效的登入 Cookie；未登入時會回傳 401。
+2. **R2 憑證或播放網址未設定**
+   - 設定上方五個 R2 環境變數，token 限定正確 bucket 的 Object Read & Write，再重新部署。
+   - R2 公開播放網址與 S3 API 網址不同，請勿混用；r2.dev 僅適合開發用途。
 
 ### Q5: 部署後資料庫是空的
 
@@ -309,7 +310,7 @@ pnpm db:push
 
 ### 1. 使用 Node Functions
 
-本專案使用 Express、Multer 與 mysql2，必須使用 Node runtime，不可將 function 切換為 Edge runtime。
+本專案使用 Express、AWS SDK 與 mysql2，使用 Node runtime，不可將 function 切換為 Edge runtime。
 
 ### 2. 設定快取策略
 

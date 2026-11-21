@@ -3,6 +3,8 @@ import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import { createSurfSession } from "./db";
 
+vi.mock("./_core/env.js", () => ({ ENV: { r2PublicUrl: "https://videos.example.com" } }));
+
 vi.mock("./db", async importOriginal => ({
   ...await importOriginal<typeof import("./db")>(),
   createSurfSession: vi.fn().mockResolvedValue({ insertId: 1 }),
@@ -101,8 +103,8 @@ describe("surfSessions", () => {
     const newSession = {
       date: "2025-11-21",
       spotName: "測試浪點",
-      videoUrl: "https://example.com/video.mp4",
-      videoPath: "test/video.mp4",
+      videoUrl: "https://videos.example.com/r2/surf-videos/1/video-123-0123456789abcdef.mp4",
+      videoPath: "r2/surf-videos/1/video-123-0123456789abcdef.mp4",
       waveQuality: 4,
       boardType: "6'2 Shortboard",
       note: "測試心得",

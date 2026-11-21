@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { TRPCClientError } from "@trpc/client";
 
 export default function Upload() {
   const [, setLocation] = useLocation();
@@ -31,6 +32,7 @@ export default function Upload() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const utils = trpc.useUtils();
+  const presignUpload = trpc.surfSessions.presignUpload.useMutation();
   const createSession = trpc.surfSessions.create.useMutation({
     onSuccess: () => {
       utils.surfSessions.invalidate();
@@ -46,8 +48,12 @@ export default function Upload() {
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.type.startsWith("video/")) {
-        toast.error("請選擇影片檔案");
+      if (!["video/mp4", "video/quicktime", "video/webm"].includes(file.type)) {
+        toast.error("請選擇 MP4、MOV 或 WebM 影片");
+        return;
+      }
+      if (file.size === 0 || file.size > 100 * 1024 * 1024) {
+        toast.error("影片不可為空，且大小不可超過 100 MiB");
         return;
       }
       setVideoFile(file);
@@ -80,34 +86,35 @@ export default function Upload() {
     setUploading(true);
 
     try {
-      // Upload video to S3
-      const formData = new FormData();
-      formData.append("file", videoFile);
-
-      const uploadResponse = await fetch("/api/upload-video", {
-        method: "POST",
-        body: formData,
+      const { uploadUrl, videoUrl, videoPath } = await presignUpload.mutateAsync({
+        contentType: videoFile.type as "video/mp4" | "video/quicktime" | "video/webm",
+        size: videoFile.size,
+      });
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": videoFile.type },
+        body: videoFile,
       });
 
       if (!uploadResponse.ok) {
-        throw new Error("影片上傳失敗");
+        throw new Error("影片上傳失敗，請稍後重試；若持續發生，請聯絡管理員檢查儲存服務設定");
       }
-
-      const { url, path } = await uploadResponse.json();
 
       // Create session record
       await createSession.mutateAsync({
         date,
         spotName: spotName.trim(),
-        videoUrl: url,
-        videoPath: path,
+        videoUrl,
+        videoPath,
         boardType: boardType.trim() || undefined,
         note: note.trim() || undefined,
         waveQuality,
       });
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("上傳失敗，請重試");
+      toast.error(error instanceof TRPCClientError && error.data?.code === "TOO_MANY_REQUESTS"
+        ? error.message : error instanceof Error && error.message.includes("影片")
+        ? error.message : "上傳失敗，請檢查網路連線後重試");
       setUploading(false);
     }
   };
@@ -163,14 +170,14 @@ export default function Upload() {
                   >
                     <Video className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                     <p className="text-muted-foreground mb-2">點擊上傳影片</p>
-                    <p className="text-sm text-muted-foreground">支援 MP4, MOV 格式</p>
+                    <p className="text-sm text-muted-foreground">支援 MP4、MOV、WebM，最大 100 MiB</p>
                   </div>
                 )}
                 <input
                   ref={fileInputRef}
                   id="video"
                   type="file"
-                  accept="video/*"
+                  accept="video/mp4,video/quicktime,video/webm"
                   onChange={handleVideoChange}
                   className="hidden"
                 />
