@@ -1,5 +1,5 @@
 import { defineConfig } from "drizzle-kit";
-import { databaseConfig } from "./server/_core/databaseConfig.js";
+import { databaseConfig } from "./server/_core/databaseConfig";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
