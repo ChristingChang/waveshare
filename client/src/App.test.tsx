@@ -39,8 +39,13 @@ describe("regular page authentication", () => {
     fireEvent.click(screen.getByRole("button", { name: "登出" }));
     await waitFor(() => expect(logout).toHaveBeenCalledOnce());
     rerender(<App />);
-    expect(screen.getByText("您尚未登入，請登入以查看衝浪紀錄。")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "使用 Google 登入" }).getAttribute("href")).toBe("/api/auth/google");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("每一道浪，都值得留下。");
+    for (const link of screen.getAllByRole("link", { name: "使用 Google 登入" })) {
+      expect(link.getAttribute("href")).toBe("/api/auth/google");
+    }
+    expect(screen.getByRole("link", { name: /先看看 WaveShare/ }).getAttribute("href")).toBe("#features");
+    expect(screen.getByRole("link", { name: "隱私權政策" }).getAttribute("href")).toBe("/privacy");
+    expect(screen.getByRole("link", { name: "服務條款" }).getAttribute("href")).toBe("/terms");
     expect(screen.queryByRole("button", { name: "登出" })).toBeNull();
     expect(screen.queryByText("首頁內容")).toBeNull();
     expect(window.location.pathname).toBe("/");
