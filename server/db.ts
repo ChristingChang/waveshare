@@ -1,10 +1,13 @@
-import { desc, eq } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import { and, desc, eq } from "drizzle-orm";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2/promise";
 import { InsertUser, users } from "../drizzle/schema.js";
 import { databaseConfig } from "./_core/databaseConfig.js";
 
-let _db: MySql2Database<Record<string, unknown>> | null = null;
+type Database = MySql2Database<Record<string, unknown>>;
+
+let _db: Database | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -190,14 +193,19 @@ export async function createSurfSession(session: {
   note?: string;
   boardType?: string;
   waveQuality: number;
-}) {
+}, companionIds?: number[]) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
+
   const { surfSessions } = await import("../drizzle/schema.js");
-  
-  const result = await db.insert(surfSessions).values(session);
-  return result;
+  if (!companionIds?.length) return db.insert(surfSessions).values(session);
+
+  return db.transaction(async tx => {
+    const ids = await validateCompanions(tx, session.userId, companionIds);
+    const result = await tx.insert(surfSessions).values(session);
+    await insertSessionCompanions(tx, result[0].insertId, ids);
+    return result;
+  });
 }
 
 // Update surf session
@@ -214,25 +222,31 @@ export async function updateSurfSession(
     note?: string;
     boardType?: string;
     waveQuality?: number;
-  }
+  },
+  companionIds?: number[]
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
   const { surfSessions } = await import("../drizzle/schema.js");
-  const { and } = await import("drizzle-orm");
-  
-  const result = await db
-    .update(surfSessions)
-    .set(updates)
-    .where(
-      and(
-        eq(surfSessions.id, sessionId),
-        eq(surfSessions.userId, userId)
-      )
-    );
-  
-  return result;
+  const ownedSession = and(eq(surfSessions.id, sessionId), eq(surfSessions.userId, userId));
+  if (companionIds === undefined) {
+    return db.update(surfSessions).set(updates).where(ownedSession);
+  }
+
+  return db.transaction(async tx => {
+    const [session] = await tx.select({ id: surfSessions.id }).from(surfSessions)
+      .where(ownedSession).for("update");
+    if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "找不到此紀錄" });
+
+    const ids = await validateCompanions(tx, userId, companionIds);
+    const result = Object.values(updates).some(value => value !== undefined)
+      ? await tx.update(surfSessions).set(updates).where(ownedSession)
+      : undefined;
+    await removeSessionCompanions(tx, sessionId);
+    await insertSessionCompanions(tx, sessionId, ids);
+    return result;
+  });
 }
 
 // Get board type statistics
@@ -340,8 +354,10 @@ export async function rejectFriendRequest(requestId: number, userId: number) {
 // Get user's friends list
 export async function getUserFriends(userId: number) {
   const db = await getDb();
-  if (!db) return [];
-  
+  return db ? selectUserFriends(db, userId) : [];
+}
+
+async function selectUserFriends(db: Database, userId: number) {
   const { friendships, users } = await import("../drizzle/schema.js");
   const { or, and } = await import("drizzle-orm");
   
@@ -440,12 +456,19 @@ export async function searchUsers(query: string, currentUserId: number) {
  * Session Companions Management
  */
 
-// Add companions to a session
-export async function addSessionCompanions(sessionId: number, companionIds: number[]) {
+async function validateCompanions(db: Database, userId: number, companionIds: number[]) {
+  const ids = Array.from(new Set(companionIds));
+  if (!ids.length) return ids;
+  const friends = await selectUserFriends(db, userId);
+  const acceptedIds = new Set(friends.map(friend => friend.userId === userId ? friend.friendId : friend.userId));
+  if (ids.some(id => id === userId || !acceptedIds.has(id))) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "只能標記已接受好友邀請的好友" });
+  }
+  return ids;
+}
+
+async function insertSessionCompanions(db: Database, sessionId: number, companionIds: number[]) {
   if (companionIds.length === 0) return;
-  
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
   
   const { sessionCompanions } = await import("../drizzle/schema.js");
   
@@ -457,33 +480,30 @@ export async function addSessionCompanions(sessionId: number, companionIds: numb
   await db.insert(sessionCompanions).values(values);
 }
 
-// Remove all companions from a session
-export async function removeSessionCompanions(sessionId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  
+async function removeSessionCompanions(db: Database, sessionId: number) {
   const { sessionCompanions } = await import("../drizzle/schema.js");
   
   await db.delete(sessionCompanions).where(eq(sessionCompanions.sessionId, sessionId));
 }
 
 // Get companions for a session
-export async function getSessionCompanions(sessionId: number) {
+export async function getSessionCompanions(sessionId: number, userId: number) {
   const db = await getDb();
   if (!db) return [];
   
-  const { sessionCompanions, users } = await import("../drizzle/schema.js");
+  const { sessionCompanions, surfSessions, users } = await import("../drizzle/schema.js");
   
   const result = await db
     .select({
-      id: sessionCompanions.id,
       companionId: sessionCompanions.companionId,
       name: users.name,
       email: users.email,
     })
     .from(sessionCompanions)
+    .innerJoin(surfSessions, eq(surfSessions.id, sessionCompanions.sessionId))
     .leftJoin(users, eq(users.id, sessionCompanions.companionId))
-    .where(eq(sessionCompanions.sessionId, sessionId));
+    .where(and(eq(sessionCompanions.sessionId, sessionId), eq(surfSessions.userId, userId)))
+    .orderBy(sessionCompanions.id);
   
   return result;
 }
@@ -494,18 +514,12 @@ export async function deleteSurfSession(sessionId: number, userId: number) {
   if (!db) throw new Error("Database not available");
   
   const { surfSessions } = await import("../drizzle/schema.js");
-  const { and } = await import("drizzle-orm");
-  
-  const result = await db
-    .delete(surfSessions)
-    .where(
-      and(
-        eq(surfSessions.id, sessionId),
-        eq(surfSessions.userId, userId)
-      )
-    );
-  
-  return result;
+  return db.transaction(async tx => {
+    const result = await tx.delete(surfSessions)
+      .where(and(eq(surfSessions.id, sessionId), eq(surfSessions.userId, userId)));
+    if (result[0].affectedRows) await removeSessionCompanions(tx, sessionId);
+    return result;
+  });
 }
 
 export async function isVideoPathReferenced(videoPath: string): Promise<boolean> {

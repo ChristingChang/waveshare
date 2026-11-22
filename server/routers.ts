@@ -62,6 +62,13 @@ export const appRouter = router({
         return session ? withCurrentVideoUrl(session) : session;
       }),
 
+    getCompanions: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const { getSessionCompanions } = await import("./db.js");
+        return getSessionCompanions(input.id, ctx.user.id);
+      }),
+
     // Create new session
     create: protectedProcedure
       .input(
@@ -75,24 +82,20 @@ export const appRouter = router({
           note: z.string().optional(),
           boardType: z.string().optional(),
           waveQuality: z.number().min(1).max(5),
-          companionIds: z.array(z.number()).optional(),
+          companionIds: z.array(z.number().int().positive()).optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
         validateVideoReference(ctx.user.id, input.videoPath, input.videoUrl);
-        const { createSurfSession, addSessionCompanions } = await import("./db.js");
+        const { createSurfSession } = await import("./db.js");
         const { companionIds, ...sessionData } = input;
-        
-        const result = await createSurfSession({
+        const record = {
           userId: ctx.user.id,
           ...sessionData,
-        });
-        
-        // Add companions if provided
-        // Note: For now, companions feature is prepared but not fully integrated
-        // Will be completed in future update
-        
-        return result;
+        };
+        return companionIds?.length
+          ? createSurfSession(record, companionIds)
+          : createSurfSession(record);
       }),
 
     // Update session
@@ -109,7 +112,7 @@ export const appRouter = router({
           note: z.string().optional(),
           boardType: z.string().optional(),
           waveQuality: z.number().min(1).max(5).optional(),
-          companionIds: z.array(z.number()).optional(),
+          companionIds: z.array(z.number().int().positive()).optional(),
         }).refine(data => (data.videoPath === undefined) === (data.videoUrl === undefined), {
           message: "請同時提供影片網址與路徑",
         })
@@ -120,13 +123,9 @@ export const appRouter = router({
           validateVideoReference(ctx.user.id, input.videoPath, input.videoUrl);
         }
         const { updateSurfSession } = await import("./db.js");
-        
-        const result = await updateSurfSession(id, ctx.user.id, updates);
-        
-        // Note: Companions feature is prepared but not fully integrated
-        // Will be completed in future update
-        
-        return result;
+        return companionIds === undefined
+          ? updateSurfSession(id, ctx.user.id, updates)
+          : updateSurfSession(id, ctx.user.id, updates, companionIds);
       }),
 
     // Delete session
