@@ -5,9 +5,10 @@ WaveShare 浪旅誌讓浪友把衝浪影片、日期、浪點和心得記在一�
 | 文件                                             | 看這份可以知道什麼？                                                               |
 | ------------------------------------------------ | ---------------------------------------------------------------------------------- |
 | [產品規格書](product-spec.md)                    | 目前能做什麼、誰能看到紀錄、哪些功能還沒有。                                       |
-| [架構決策紀錄（ADR）](architecture-decisions.md) | 影片為什麼改存 Cloudflare R2、登入為什麼改用 GitHub、資料庫為什麼搬到 TiDB Cloud。 |
+| [架構決策紀錄（ADR）](architecture-decisions.md) | 影片為什麼改存 Cloudflare R2、登入為什麼改用 Google、資料庫為什麼搬到 TiDB Cloud。 |
 | [流程圖](flows.md)                               | 從登入、上傳到回看，一步一步會發生什麼。                                           |
 | [使用者故事](user-stories.md)                    | 從浪友的角度描述需求，以及怎麼判斷功能做對了。                                     |
+| [R2 設定教學](R2_SETUP.zh-TW.md)                 | 網站管理者怎麼設定 Cloudflare R2，讓影片可以上傳和播放。                           |
 
 ## 先分清楚現況和遷移目標
 
@@ -15,8 +16,8 @@ WaveShare 浪旅誌讓浪友把衝浪影片、日期、浪點和心得記在一�
 
 | 項目   | 主分支現況                                              | 遷移目標                                                                                                                               |
 | ------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| 影片   | 經由 WaveShare 後端送到 Manus 的儲存服務。              | 瀏覽器直接上傳新影片到 Cloudflare R2（[變更 PR](https://github.com/ChristingChang/waveshare/pull/1)）。                                |
-| 登入   | 使用 Manus 帳號。                                       | 改用 GitHub 帳號；不會自動接回舊帳號的紀錄（[變更 PR](https://github.com/ChristingChang/waveshare/pull/2)）。                          |
+| 影片   | 瀏覽器直接把新影片傳到 Cloudflare R2（[PR #1](https://github.com/ChristingChang/waveshare/pull/1) 已合併）。 | 已在主分支；正式站要先依 [R2 設定教學](R2_SETUP.zh-TW.md) 設定並實測。 |
+| 登入   | 使用 Manus 帳號。                                       | 改用 Google 帳號；不會自動接回舊帳號的紀錄（[變更 PR](https://github.com/ChristingChang/waveshare/pull/2)）。                          |
 | 資料庫 | 使用 MySQL 相容的資料庫；未確認正式站實際連到哪個服務。 | 改用 TiDB Cloud 保存帳號、好友和衝浪紀錄等資料；影片檔另存 R2（[同一個變更 PR](https://github.com/ChristingChang/waveshare/pull/2)）。 |
 
 「遷移目標」不等於「已上線」。準備部署時，請同時查閱 [Vercel 部署指南](../DEPLOY_TO_VERCEL.md) 和對應的變更 PR。
