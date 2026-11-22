@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Star, Loader2, Save } from "lucide-react";
+import { CompanionPicker } from "@/components/CompanionPicker";
 import { SpotSelector } from "@/components/SpotSelector";
 import { BOARD_TYPES } from "@shared/boardTypes";
 import {
@@ -28,12 +29,18 @@ export default function Edit() {
     { id: sessionId },
     { enabled: sessionId > 0 }
   );
+  const companions = trpc.surfSessions.getCompanions.useQuery(
+    { id: sessionId },
+    { enabled: !!session }
+  );
 
   const [date, setDate] = useState("");
   const [spotName, setSpotName] = useState("");
   const [boardType, setBoardType] = useState("");
   const [waveQuality, setWaveQuality] = useState(3);
   const [note, setNote] = useState("");
+  const [companionDraft, setCompanionDraft] = useState<{ sessionId: number; ids: number[] }>();
+  const companionIds = companionDraft?.sessionId === sessionId ? companionDraft.ids : undefined;
 
   useEffect(() => {
     if (session) {
@@ -72,6 +79,7 @@ export default function Edit() {
       boardType: boardType.trim() || undefined,
       note: note.trim() || undefined,
       waveQuality,
+      companionIds,
     });
   };
 
@@ -188,6 +196,18 @@ export default function Edit() {
                   ))}
                 </div>
               </div>
+
+              {companions.isSuccess ? (
+                <CompanionPicker
+                  value={companionIds ?? companions.data.map(companion => companion.companionId)}
+                  onChange={ids => setCompanionDraft({ sessionId, ids })}
+                  disabled={updateSession.isPending}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {companions.isError ? "無法載入衝浪夥伴，請稍後再試。" : "正在載入衝浪夥伴…"}
+                </p>
+              )}
 
               {/* Note */}
               <div className="space-y-2">
