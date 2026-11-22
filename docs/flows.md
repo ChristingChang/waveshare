@@ -1,27 +1,15 @@
 # WaveShare 流程圖
 
-「現況」指編寫時的主分支，已包含 [PR #1](https://github.com/ChristingChang/waveshare/pull/1)（影片直接傳到 R2）和 [PR #4](https://github.com/ChristingChang/waveshare/pull/4)（編輯時保留浪點）；標有 [PR #2](https://github.com/ChristingChang/waveshare/pull/2) 的流程尚未合併。主分支的流程也不代表正式站已上線。[回文件首頁](README.md)
+流程以編寫時的主分支為準，不代表正式網站已部署或驗證。[回文件首頁](README.md)
 
-## 1. 登入：現況（Manus）
+## 1. 使用 Google 帳號登入
 
-```mermaid
-flowchart TD
-    A["開啟 WaveShare"] --> B{"登入狀態仍有效？"}
-    B -->|是| C["進入網站"]
-    B -->|否| D["自動前往 Manus 登入"]
-    D --> E{"授權及帳號處理成功？"}
-    E -->|否| F["回報登入錯誤"]
-    E -->|是| G["建立登入狀態並回首頁"]
-```
-
-## 2. 登入：PR #2（Google／TiDB Cloud）
-
-以下假設 Google 登入與 TiDB Cloud 資料庫已正確設定。
+以下假設已依[部署教學](DEPLOY.zh-TW.md)設定 Google 登入與 TiDB Cloud。
 
 ```mermaid
 flowchart TD
-    A["開啟 WaveShare"] --> B{"登入狀態仍有效？"}
-    B -->|是| C["進入網站"]
+    A["開啟日誌、好友等須登入的頁面"] --> B{"登入狀態仍有效？"}
+    B -->|是| C["進入頁面"]
     B -->|否| D["自動前往 Google 登入與授權"]
     D --> E{"同意授權且 WaveShare 確認回應有效？"}
     E -->|否| F["顯示錯誤，不會登入"]
@@ -33,7 +21,7 @@ flowchart TD
 
 即使電子郵件相同，第一次用 Google 登入也會建立新帳號，不會自動合併舊 Manus 帳號。
 
-## 3. 新增紀錄：現況（直接傳到 R2）
+## 2. 新增紀錄：直接傳到 R2
 
 ```mermaid
 flowchart TD
@@ -53,7 +41,7 @@ flowchart TD
 
 上傳網址有效 10 分鐘。每位使用者在任意連續 24 小時內最多申請 10 次，沒傳完也算。影片不經過 WaveShare 後端，所以不受 Vercel 約 4.5 MB 的請求限制；PR #1 之前經由後端轉存到 Manus Forge 的做法已移除。
 
-## 4. 回看紀錄與播放影片
+## 3. 回看紀錄與播放影片
 
 ```mermaid
 flowchart TD
@@ -67,7 +55,7 @@ flowchart TD
 
 R2 影片可憑公開網址播放。PR #1 之前上傳的 Forge 影片仍使用原網址，可否直接播放取決於原儲存服務。
 
-## 5. 編輯或刪除紀錄
+## 4. 編輯或刪除紀錄
 
 ```mermaid
 flowchart TD
@@ -88,7 +76,7 @@ flowchart TD
 
 編輯時只改評分或心得，原本的浪點不會被清空（[PR #4](https://github.com/ChristingChang/waveshare/pull/4) 修正）。R2 刪檔失敗不會復原日誌；舊 Forge 影片不受影響。
 
-## 6. 未使用影片的清理：現況（選用）
+## 5. 未使用影片的清理（選用）
 
 ```mermaid
 flowchart TD
