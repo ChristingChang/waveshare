@@ -116,7 +116,7 @@ photoViewRouter.get("/:photoId", async (req, res) => {
 
   try {
     const photo = await getSessionPhoto(photoId);
-    if (!photo || !canViewSessionVideo(viewer, { id: photo.sessionId, userId: photo.userId })) {
+    if (!photo || !await canViewSessionVideo(viewer, { id: photo.sessionId, userId: photo.userId })) {
       res.status(404).json({ error: "找不到照片" });
       return;
     }

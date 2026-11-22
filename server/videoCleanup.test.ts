@@ -7,7 +7,7 @@ import { deleteR2Photo } from "./photos.js";
 import { cleanupUnusedPhotos, cleanupUnusedVideos } from "./videoCleanup.js";
 import { sessionPhotos, surfSessions } from "../drizzle/schema.js";
 
-vi.mock("./db.js", () => ({ getDb: vi.fn() }));
+vi.mock("./db.js", async importOriginal => ({ isMissingTableError: (await importOriginal<typeof import("./db.js")>()).isMissingTableError, getDb: vi.fn() }));
 vi.mock("./r2.js", () => ({ deleteR2Video: vi.fn() }));
 vi.mock("./photos.js", () => ({ deleteR2Photo: vi.fn() }));
 
@@ -87,6 +87,12 @@ describe("unused photo cleanup", () => {
     expect(query.sql).toContain("`session_photos`.`photoPath` = `photo_uploads`.`photoPath`");
     expect(deleteR2Photo).toHaveBeenCalledWith(42, photoRow.photoPath);
     expect(vi.mocked(deleteR2Photo).mock.invocationCallOrder[0]).toBeLessThan(remove.mock.invocationCallOrder[0]);
+  });
+
+  it("skips photo cleanup while the photo tables do not exist yet", async () => {
+    limit.mockRejectedValueOnce(Object.assign(new Error("Failed query"), { cause: { errno: 1146, code: "ER_NO_SUCH_TABLE" } }));
+    await expect(cleanupUnusedPhotos()).resolves.toEqual({ scanned: 0, deleted: 0, failed: 0 });
+    expect(deleteR2Photo).not.toHaveBeenCalled();
   });
 
   it("keeps the upload row when the R2 delete fails", async () => {

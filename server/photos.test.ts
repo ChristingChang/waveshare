@@ -9,7 +9,7 @@ import type { TrpcContext } from "./_core/context.js";
 import { appRouter } from "./routers.js";
 import {
   addSessionPhotos, createSurfSession, deleteSurfSession, getSessionById, getSessionPhoto, getSessionPhotos,
-  getUserByOpenId, isPhotoPathReferenced, removeSessionPhotos, updateSurfSession,
+  canFriendViewSession, getSessionsSharedWithUser, getUserByOpenId, isPhotoPathReferenced, removeSessionPhotos, updateSurfSession,
 } from "./db.js";
 import { isR2PhotoPath } from "./photos.js";
 import { reservePhotoUpload } from "./videoUploads.js";
@@ -23,6 +23,7 @@ vi.mock("./db.js", () => ({
   getDb: vi.fn(), getUserByOpenId: vi.fn(), getSessionPhoto: vi.fn(), getSessionPhotos: vi.fn(), getSessionById: vi.fn(),
   createSurfSession: vi.fn(), updateSurfSession: vi.fn(), deleteSurfSession: vi.fn(), addSessionPhotos: vi.fn(),
   removeSessionPhotos: vi.fn(), isPhotoPathReferenced: vi.fn(), isVideoPathReferenced: vi.fn(),
+  canFriendViewSession: vi.fn(), getSessionsSharedWithUser: vi.fn(),
 }));
 vi.mock("./videoUploads.js", () => ({ reservePhotoUpload: vi.fn(), reserveVideoUpload: vi.fn() }));
 
@@ -53,6 +54,7 @@ beforeEach(() => {
   vi.mocked(removeSessionPhotos).mockResolvedValue([]);
   vi.mocked(isPhotoPathReferenced).mockResolvedValue(false);
   vi.mocked(createSurfSession).mockResolvedValue([{ insertId: 7 }] as never);
+  vi.mocked(canFriendViewSession).mockResolvedValue(false);
 });
 afterAll(async () => {
   await new Promise<void>((resolve, reject) => {
@@ -83,6 +85,12 @@ describe("private photo viewing", () => {
     expect((await view("/api/photos/3", "google:owner")).status).toBe(404);
     expect((await view("/api/photos/abc", "google:owner")).status).toBe(404);
     expect(getSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("lets a friend the record is shared with see its photos", async () => {
+    vi.mocked(canFriendViewSession).mockResolvedValueOnce(true);
+    expect((await view("/api/photos/3", "google:other")).status).toBe(302);
+    expect(canFriendViewSession).toHaveBeenCalledWith(7, 43);
   });
 });
 
@@ -128,6 +136,14 @@ describe("record photos", () => {
     vi.mocked(getSessionById).mockResolvedValueOnce({ id: 7, userId: 42, videoPath: "", videoUrl: "" } as never);
     vi.mocked(getSessionPhotos).mockResolvedValueOnce([{ id: 3, sessionId: 7, userId: 42, photoPath: photo(1), createdAt: new Date() }]);
     expect((await caller.surfSessions.getById({ id: 7 }))?.photos).toEqual([{ id: 3, url: "/api/photos/3" }]);
+  });
+
+  it("shows a shared record's photos to the friend", async () => {
+    vi.mocked(getSessionById).mockResolvedValueOnce(undefined);
+    vi.mocked(getSessionsSharedWithUser).mockResolvedValueOnce([{ id: 7, userId: 41, videoUrl: "", ownerName: "Amy" }] as never);
+    vi.mocked(getSessionPhotos).mockResolvedValueOnce([{ id: 3, sessionId: 7, userId: 41, photoPath: photo(1), createdAt: new Date() }]);
+    expect(await caller.surfSessions.getById({ id: 7 })).toMatchObject({ isOwner: false, photos: [{ id: 3, url: "/api/photos/3" }] });
+    expect(getSessionPhotos).toHaveBeenCalledWith(7, 41);
   });
 
   it("adds and removes photos on edit and deletes removed files from R2", async () => {

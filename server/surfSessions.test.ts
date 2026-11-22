@@ -1,11 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
-import { createSurfSession } from "./db";
+import { createSurfSession, getSessionById, getSessionShareIds, getSessionsSharedWithUser, setSessionShares } from "./db";
 
 vi.mock("./db", async importOriginal => ({
   ...await importOriginal<typeof import("./db")>(),
   createSurfSession: vi.fn().mockResolvedValue({ insertId: 1 }),
+  getSessionById: vi.fn(), getSessionShareIds: vi.fn(),
+  getSessionsSharedWithUser: vi.fn(), setSessionShares: vi.fn(),
 }));
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
@@ -38,6 +40,56 @@ function createAuthContext(): { ctx: TrpcContext } {
 }
 
 describe("surfSessions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getSessionById).mockResolvedValue(undefined);
+    vi.mocked(getSessionsSharedWithUser).mockResolvedValue([]);
+  });
+
+  const record = { id: 7, userId: 1, date: "2026-11-22", spotName: "烏石港", videoUrl: "private", videoPath: "private", waveQuality: 4 };
+
+  it("returns the owner's record with ownership metadata", async () => {
+    vi.mocked(getSessionById).mockResolvedValue(record as never);
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    expect(await caller.surfSessions.getById({ id: 7 })).toMatchObject({ isOwner: true, ownerName: "Test User", videoUrl: "/api/videos/7" });
+  });
+
+  it("returns a shared friend's read-only record but nothing to a stranger", async () => {
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    vi.mocked(getSessionsSharedWithUser).mockResolvedValueOnce([{ ...record, userId: 2, ownerName: "浪友", videoUrl: "/api/videos/7" }] as never);
+    expect(await caller.surfSessions.getById({ id: 7 })).toMatchObject({ isOwner: false, ownerName: "浪友", videoUrl: "/api/videos/7" });
+    expect(getSessionsSharedWithUser).toHaveBeenCalledWith(1, 7);
+    expect(await caller.surfSessions.getById({ id: 7 })).toBeUndefined();
+  });
+
+  it("lists records shared with the current user, including an empty list", async () => {
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    const records = [{ ...record, ownerName: "浪友", videoUrl: "/api/videos/7" }];
+    vi.mocked(getSessionsSharedWithUser).mockResolvedValueOnce(records as never);
+    expect(await caller.surfSessions.getSharedWithMe()).toEqual(records);
+    expect(getSessionsSharedWithUser).toHaveBeenCalledWith(1);
+    expect(await caller.surfSessions.getSharedWithMe()).toEqual([]);
+  });
+
+  it("only lets the owner read or replace shares", async () => {
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    await expect(caller.surfSessions.getShares({ id: 7 })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(caller.surfSessions.setShares({ id: 7, friendIds: [2] })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(setSessionShares).not.toHaveBeenCalled();
+    vi.mocked(getSessionById).mockResolvedValue(record as never);
+    vi.mocked(getSessionShareIds).mockResolvedValue([2]);
+    vi.mocked(setSessionShares).mockResolvedValue([]);
+    expect(await caller.surfSessions.getShares({ id: 7 })).toEqual([2]);
+    expect(await caller.surfSessions.setShares({ id: 7, friendIds: [] })).toEqual([]);
+    expect(setSessionShares).toHaveBeenCalledWith(7, 1, []);
+  });
+
+  it("propagates sharing errors", async () => {
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    vi.mocked(getSessionById).mockResolvedValue(record as never);
+    vi.mocked(setSessionShares).mockRejectedValueOnce(new Error("query failed"));
+    await expect(caller.surfSessions.setShares({ id: 7, friendIds: [2] })).rejects.toThrow("query failed");
+  });
   it("should get user stats", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
