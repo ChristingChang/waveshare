@@ -4,17 +4,13 @@ import { appRouter } from "./routers.js";
 
 const { query } = vi.hoisted(() => ({ query: vi.fn() }));
 vi.mock("mysql2/promise", () => ({ createPool: () => ({ query }) }));
-vi.mock("./_core/env.js", () => ({ ENV: { r2PublicUrl: "https://videos.example.com" } }));
 
 const ownerId = 1;
 const taggedId = 2;
 const sessionId = 7;
 const date = "2025-11-21";
 const videoPath = "r2/surf-videos/1/video-123-0123456789abcdef.mp4";
-const record = {
-  date, spotName: "烏石港", waveQuality: 4, videoPath,
-  videoUrl: `https://videos.example.com/${videoPath}`,
-};
+const record = { date, spotName: "烏石港", waveQuality: 4, videoPath };
 
 function caller(userId: number) {
   return appRouter.createCaller({ user: { id: userId }, req: {}, res: {} } as TrpcContext).surfSessions;
@@ -66,6 +62,16 @@ describe("journal companions", () => {
       .rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(statements()).toEqual([ "begin", expect.stringContaining("for update"),
       expect.stringContaining("from `friendships`"), "rollback" ]);
+  });
+
+  it("clears the stored video URL when replacing the video and companion tags together", async () => {
+    await caller(ownerId).update({ id: sessionId, videoPath, companionIds: [taggedId] });
+    const update = query.mock.calls.find(([options]) => options.sql.startsWith("update `surf_sessions`"));
+    expect(update).toEqual([
+      expect.objectContaining({ sql: expect.stringContaining("set `videoUrl` = ?, `videoPath` = ?") }),
+      ["", videoPath, sessionId, ownerId],
+    ]);
+    expect(writesCompanions().map(([, params]) => params)).toEqual([[sessionId, taggedId]]);
   });
 
   it("replaces tags, clears them with an empty array, and leaves them alone when omitted", async () => {

@@ -15,6 +15,7 @@ import {
 import { ArrowLeft, Edit, Trash2, Star, Calendar, Waves } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { SessionVideo } from "@/components/SessionVideo";
 
 export default function Detail() {
   const [, params] = useRoute("/detail/:id");
@@ -132,7 +133,7 @@ export default function Detail() {
       <div className="container max-w-2xl py-6 px-4 space-y-6">
         {/* Video Player */}
         <Card className="overflow-hidden bg-card">
-          <video
+          <SessionVideo
             src={session.videoUrl}
             controls
             className="w-full bg-black"
