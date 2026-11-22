@@ -6,8 +6,8 @@ ADR 記下「要改什麼、有哪些取捨、上線前要確認什麼」。**�
 | ------- | ------------------------ | ---------------------------------------------------------------------------------------- | ------ |
 | ADR-001 | 新影片改用 Cloudflare R2 | 已接受；[PR #1](https://github.com/ChristingChang/waveshare/pull/1) 已合併到主分支       | 未驗證 |
 | ADR-002 | 登入改用 GitHub          | 已被 [ADR-004](#adr-004登入從-manus-改用-google) 取代；未合併 | 不適用 |
-| ADR-003 | 資料庫改用 TiDB Cloud    | PR #2 有連線設定和部署教學，尚未合併                                                     | 未驗證 |
-| ADR-004 | 登入改用 Google          | [PR #2](https://github.com/ChristingChang/waveshare/pull/2) 有實作，尚未合併             | 未驗證 |
+| ADR-003 | 資料庫改用 TiDB Cloud    | 已接受；[PR #2](https://github.com/ChristingChang/waveshare/pull/2) 已合併到主分支       | 未驗證 |
+| ADR-004 | 登入改用 Google          | 已接受；[PR #2](https://github.com/ChristingChang/waveshare/pull/2) 已合併到主分支       | 未驗證 |
 
 ## ADR-001：新影片改由瀏覽器直接傳到 Cloudflare R2
 
@@ -23,9 +23,9 @@ ADR 記下「要改什麼、有哪些取捨、上線前要確認什麼」。**�
 
 ## ADR-002：登入從 Manus 改用 GitHub
 
-**狀態：已被 [ADR-004](#adr-004登入從-manus-改用-google) 取代。** 以下保留當時的決策，不是目前的部署指引。
+**狀態：已被 [ADR-004](#adr-004登入從-manus-改用-google) 取代。** 以下保留原決策；文中的「現行」指當時的 Manus 版本，不是現在的做法。
 
-**背景。** 現行登入依賴 Manus 授權，以 Manus 提供的身分識別碼找到 WaveShare 帳號。日誌和好友關係依附 WaveShare 的內部使用者編號，不會因登入服務換了就自動換到新帳號。見[現行登入程式](../server/_core/oauth.ts)與[資料結構](../drizzle/schema.ts)。
+**背景。** 現行登入依賴 Manus 授權，以 Manus 提供的身分識別碼找到 WaveShare 帳號。日誌和好友關係依附 WaveShare 的內部使用者編號，不會因登入服務換了就自動換到新帳號。見[當時的登入程式](https://github.com/ChristingChang/waveshare/blob/77c54ca/server/_core/oauth.ts)與[資料結構](../drizzle/schema.ts)。
 
 **決策。** 改用 GitHub 帳號登入，取代 Manus 登入。其他可行方式包括保留 Manus，或另外支援 Email／其他登入服務；不推定選擇 GitHub 的理由。
 
@@ -35,29 +35,32 @@ ADR 記下「要改什麼、有哪些取捨、上線前要確認什麼」。**�
 
 ## ADR-003：正式資料庫改用 TiDB Cloud
 
-**背景。** WaveShare 透過 MySQL 相容方式連資料庫；現有[程式](../server/db.ts)與[部署指南](../DEPLOY_TO_VERCEL.md)已按 MySQL／TiDB 撰寫，但儲存庫無法證明正式站現在連到哪一家服務或是否已有資料。
+**狀態：已接受。** [PR #2](https://github.com/ChristingChang/waveshare/pull/2) 已合併到主分支；正式站的連線與資料未驗證。
 
-**決策。** 正式站以 TiDB Cloud 儲存帳號、衝浪紀錄及好友等資料；影片檔仍放在獨立的儲存服務。其他可行方式包括沿用現有資料庫或改用其他受管 MySQL；不推定選擇 TiDB Cloud 的理由。
+**背景。** WaveShare 透過 MySQL 相容方式連資料庫，TiDB Cloud 支援這種連線方式。
 
-**取捨。** 不必自行維護資料庫主機，也可沿用 MySQL 資料結構。PR #2 對 TiDB Cloud 自動使用加密連線並驗證伺服器憑證；仍要實測連線、資料表變更與相容性。設定新連線不會把舊資料搬過去。
+**決策。** 部署時採用 TiDB Cloud 儲存帳號、衝浪紀錄及好友等資料；影片檔另存 Cloudflare R2。其他可行方式包括沿用現有資料庫或改用其他受管 MySQL；不推定選擇 TiDB Cloud 的理由。
 
-**上線前。** 在 TiDB 套用版本對應的資料表變更，驗證 WaveShare 能讀寫資料。若要搬舊資料，先備份，再核對資料筆數、使用者與日誌／好友的關聯；切換後驗證影片仍可播放，並保留回復方式。
+**取捨。** 不必自行維護資料庫主機，也可沿用 MySQL 資料結構。連到以 `.tidbcloud.com` 結尾的主機時，WaveShare 會自動使用加密連線，並核對憑證和主機名稱。設定新連線不會把舊資料搬過去。
+
+**上線前。** 依[部署教學](DEPLOY.zh-TW.md)設定 TiDB Cloud 和更新資料表，並驗證 WaveShare 能讀寫資料。若要搬舊資料，先備份，再核對資料筆數、使用者與日誌／好友的關聯；切換後驗證影片仍可播放，並保留回復方式。
 
 ## ADR-004：登入從 Manus 改用 Google
 
+**狀態：已接受。** [PR #2](https://github.com/ChristingChang/waveshare/pull/2) 已合併到主分支；正式站登入未驗證。
+
 **背景。** 不依賴 Manus 的版本原先規劃用 GitHub 登入（[ADR-002](#adr-002登入從-manus-改用-github)）。張淨雅認為要浪友用 GitHub 帳號登入不自然，改用浪友較熟悉的 Google 帳號。
 
-**決策。** 用 Google 取代 Manus 登入，不採用 GitHub 登入。主分支仍使用 Manus；[PR #2](https://github.com/ChristingChang/waveshare/pull/2) 已實作 Google 登入，但尚未合併。
+**決策。** 主分支改用 Google 登入，不採用 GitHub 登入。原本的 Manus 登入和 Forge 整合程式已移除，部署也不需要舊 Manus 設定。
 
 **取捨。** 浪友需要 Google 帳號，但不用再開 Manus 或 GitHub 帳號。WaveShare 用 Google 提供的專屬代號（儲存為 `google:<sub>`）辨識帳號，不用電子郵件比對。電子郵件只有經 Google 驗證才會儲存，其他浪友也不能用它搜尋。就算地址相同，舊 Manus 使用者也會從新的 WaveShare 帳號開始，舊日誌和好友不會自動轉入；切換登入不會刪除舊資料。
 
-**上線前。** 依 [Google 登入部署教學（PR #2）](https://github.com/ChristingChang/waveshare/blob/09fac3e824c46d8f2d193d74cf3d127d35dec6b0/docs/DEPLOY.zh-TW.md)完成設定，並在實際部署的測試站確認登入、取消授權、登出，以及用同一帳號再次登入仍能看到日誌。若要接回舊日誌，須另外規劃帳號對應。
+**上線前。** 依[部署教學](DEPLOY.zh-TW.md)完成設定，並在實際部署的測試站確認登入、取消授權、登出，以及用同一帳號再次登入仍能看到日誌。若要接回舊日誌，須另外規劃帳號對應。
 
 - **登入網址：** WaveShare 從 `/api/auth/google` 把使用者送往 Google，Google 授權後回到 `/api/auth/google/callback`。
 - **部署設定：** 設定 `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` 與維持登入用的 `SESSION_SECRET`。`GOOGLE_CALLBACK_URL` 可選填；未填時，WaveShare 用發起登入的網站網址組成返回網址。這個返回網址必須和 Google 後台登記的完全一致。
 
 ## 切換時的依賴與待確認事項
 
-- **程式合併：** R2 上傳的 PR #1 已合併到主分支；Google 登入與 TiDB Cloud 的 PR #2 原本接在 PR #1 上，仍待合併。R2 不需要等換資料庫就能使用。
-- **正式切換：** R2 需要先在目標資料庫建立所需的表；Google 登入需要在目標資料庫正確找到使用者。可先在測試環境把兩項一起驗證。
+- **正式切換：** 先在目標資料庫建立所需的表，再到測試站確認 Google 登入能建立或找回帳號，以及 R2 影片能上傳和播放。
 - **資料接續：** 尚未確認正式站的既有資料、舊 Manus 帳號的對應方式，以及 Forge 影片是否須搬遷。若需要不公開的影片，應先選定私人播放方式，而不是使用目前的 R2 公開網址。
