@@ -111,6 +111,8 @@ pnpm test
 
 **影片直接上傳：** 登入後先由 tRPC 取得 10 分鐘有效的 R2 預簽 PUT 網址，再由瀏覽器直接上傳 MP4、MOV 或 WebM（最多 100 MiB）。影片不經 Vercel function，因此不受其約 4.5 MB body 限制；舊 `/api/upload-video` 路由已移除。播放時影片頁使用 `/api/videos/<紀錄編號>`：伺服器確認登入者是紀錄擁有者後，才轉址到 15 分鐘有效的 R2 預簽 GET 網址；未登入回 401，其他帳號回 404。R2 bucket 應關閉公開存取（r2.dev 與自訂網域），舊的公開網址才會失效。詳見 [R2 設定教學](docs/R2_SETUP.zh-TW.md) 與 [部署指南](DEPLOY_TO_VERCEL.md)。
 
+**影片選填與照片：** 紀錄可不附影片。每筆紀錄最多 10 張照片（JPG、PNG、HEIC，每張最多 20 MiB），同樣以預簽 PUT 直接上傳到 `r2/surf-photos/<使用者>/`，每人每 24 小時最多 100 張。照片透過 `/api/photos/<照片編號>` 顯示，權限與影片相同（目前僅擁有者），轉址到 15 分鐘有效的 R2 預簽 GET 網址。未被紀錄使用的照片由每日清理排程刪除。部署前需建立 `photo_uploads` 與 `session_photos` 資料表：在 TiDB Cloud SQL Editor 貼上執行 `drizzle/manual/0005_photos.sql`（或 `pnpm db:push`）。資料表尚未建立時，紀錄頁仍可開啟，只是不顯示照片。
+
 ## 專案結構
 
 ```

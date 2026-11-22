@@ -269,19 +269,113 @@ export async function createSurfSession(session: {
   note?: string;
   boardType?: string;
   waveQuality: number;
-}, companionIds?: number[]) {
+}, photoPaths: string[] = [], companionIds?: number[]) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const { surfSessions } = await import("../drizzle/schema.js");
-  if (!companionIds?.length) return db.insert(surfSessions).values(session);
+  const { surfSessions, sessionPhotos } = await import("../drizzle/schema.js");
 
   return db.transaction(async tx => {
-    const ids = await validateCompanions(tx, session.userId, companionIds);
+    const ids = companionIds?.length ? await validateCompanions(tx, session.userId, companionIds) : [];
     const result = await tx.insert(surfSessions).values(session);
-    await insertSessionCompanions(tx, result[0].insertId, ids);
+    const sessionId = result[0].insertId;
+    if (photoPaths.length) {
+      await tx.insert(sessionPhotos).values(photoPaths.map(photoPath => ({ sessionId, userId: session.userId, photoPath })));
+    }
+    await insertSessionCompanions(tx, sessionId, ids);
     return result;
   });
+}
+
+/**
+ * Session Photos
+ */
+
+// Lets record pages keep working if the photo tables have not been created yet.
+export function isMissingTableError(error: unknown): boolean {
+  for (let e = error as { errno?: number; code?: string; cause?: unknown } | undefined; e; e = e.cause as typeof e) {
+    if (e.errno === 1146 || e.code === "ER_NO_SUCH_TABLE") return true;
+  }
+  return false;
+}
+
+export async function getSessionPhotos(sessionId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { sessionPhotos } = await import("../drizzle/schema.js");
+  const { and, asc } = await import("drizzle-orm");
+  try {
+    return await db.select().from(sessionPhotos)
+      .where(and(eq(sessionPhotos.sessionId, sessionId), eq(sessionPhotos.userId, userId)))
+      .orderBy(asc(sessionPhotos.id));
+  } catch (error) {
+    if (isMissingTableError(error)) return [];
+    throw error;
+  }
+}
+
+export async function getSessionPhoto(photoId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { sessionPhotos } = await import("../drizzle/schema.js");
+  const result = await db.select({
+    id: sessionPhotos.id, sessionId: sessionPhotos.sessionId, userId: sessionPhotos.userId, photoPath: sessionPhotos.photoPath,
+  }).from(sessionPhotos).where(eq(sessionPhotos.id, photoId)).limit(1);
+  return result[0];
+}
+
+// Removes and adds a session's photos in one transaction; returns the removed rows.
+export async function changeSessionPhotos(sessionId: number, userId: number, removeIds: number[], addPaths: string[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { sessionPhotos } = await import("../drizzle/schema.js");
+  const { and, inArray } = await import("drizzle-orm");
+  return db.transaction(async tx => {
+    let removed: (typeof sessionPhotos.$inferSelect)[] = [];
+    if (removeIds.length) {
+      const condition = and(eq(sessionPhotos.sessionId, sessionId), eq(sessionPhotos.userId, userId), inArray(sessionPhotos.id, removeIds));
+      removed = await tx.select().from(sessionPhotos).where(condition);
+      if (removed.length) await tx.delete(sessionPhotos).where(condition);
+    }
+    if (addPaths.length) {
+      await tx.insert(sessionPhotos).values(addPaths.map(photoPath => ({ sessionId, userId, photoPath })));
+    }
+    return removed;
+  });
+}
+
+// Removes the given photos (or all of the session's photos) and returns the removed rows.
+export async function removeSessionPhotos(sessionId: number, userId: number, photoIds?: number[]) {
+  if (photoIds && !photoIds.length) return [];
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { sessionPhotos } = await import("../drizzle/schema.js");
+  const { and, inArray } = await import("drizzle-orm");
+  const condition = and(
+    eq(sessionPhotos.sessionId, sessionId),
+    eq(sessionPhotos.userId, userId),
+    photoIds ? inArray(sessionPhotos.id, photoIds) : undefined,
+  );
+  let rows;
+  try {
+    rows = await db.select().from(sessionPhotos).where(condition);
+  } catch (error) {
+    if (!photoIds && isMissingTableError(error)) return [];
+    throw error;
+  }
+  if (rows.length) await db.delete(sessionPhotos).where(condition);
+  return rows;
+}
+
+export async function isPhotoPathReferenced(photoPath: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { sessionPhotos } = await import("../drizzle/schema.js");
+  const matches = await db.select({ id: sessionPhotos.id })
+    .from(sessionPhotos)
+    .where(eq(sessionPhotos.photoPath, photoPath))
+    .limit(1);
+  return matches.length > 0;
 }
 
 // Update surf session

@@ -6,6 +6,7 @@ import { isR2SessionVideo, presignVideoPlayback } from "./r2.js";
 
 type SessionVideo = { id: number; userId: number; videoPath: string; videoUrl: string };
 
+// Single place that decides who may see a session's video and photos.
 export async function canViewSessionVideo(viewer: Pick<User, "id">, session: Pick<SessionVideo, "id" | "userId">, lookup = canFriendViewSession) {
   return viewer.id === session.userId || await lookup(session.id, viewer.id);
 }

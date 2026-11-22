@@ -10,6 +10,7 @@ const taggedId = 2;
 const sessionId = 7;
 const date = "2025-11-21";
 const videoPath = "r2/surf-videos/1/video-123-0123456789abcdef.mp4";
+const photoPath = "r2/surf-photos/1/photo-123-0123456789abcdef.jpg";
 const record = { date, spotName: "烏石港", waveQuality: 4, videoPath };
 
 function caller(userId: number) {
@@ -30,6 +31,10 @@ beforeEach(() => {
       expect(sql).toContain("`surf_sessions`.`userId` = ?");
       expect(params[0]).toBe(sessionId);
       return [params[1] === ownerId ? [[taggedId, "小安", null]] : []];
+    }
+    if (sql.startsWith("select") && sql.includes("from `session_photos`")) {
+      expect(params).toEqual([sessionId, ownerId]);
+      return [[[3, sessionId, ownerId, photoPath, new Date()]]];
     }
     if (sql.startsWith("select") && sql.includes("from `session_shares`")) {
       expect(sql).toContain("`session_shares`.`friendId` = ?");
@@ -71,6 +76,8 @@ afterEach(() => vi.unstubAllEnvs());
 const statements = () => query.mock.calls.map(([options]) => options.sql as string);
 const writesCompanions = () => query.mock.calls.filter(([options]) =>
   options.sql.startsWith("insert into `session_companions`"));
+const writesPhotos = () => query.mock.calls.filter(([options]) =>
+  options.sql.startsWith("insert into `session_photos`"));
 
 describe("journal companions", () => {
   it("creates and deduplicates a tag for an accepted friend", async () => {
@@ -79,6 +86,16 @@ describe("journal companions", () => {
     expect(statements()).toEqual([ "begin", expect.stringContaining("from `friendships`"),
       expect.stringContaining("insert into `surf_sessions`"),
       expect.stringContaining("insert into `session_companions`"), "commit" ]);
+  });
+
+  it("creates a photo-only record and its companion tags in one transaction", async () => {
+    await caller(ownerId).create({
+      date, spotName: record.spotName, waveQuality: record.waveQuality,
+      photoPaths: [photoPath], companionIds: [taggedId],
+    });
+    expect(writesPhotos().map(([, params]) => params)).toEqual([[sessionId, ownerId, photoPath]]);
+    expect(writesCompanions().map(([, params]) => params)).toEqual([[sessionId, taggedId]]);
+    expect(statements().filter(sql => ["begin", "commit"].includes(sql))).toEqual(["begin", "commit"]);
   });
 
   it("rejects an unaccepted user without changing the record or existing tags", async () => {
@@ -96,6 +113,12 @@ describe("journal companions", () => {
       ["", videoPath, sessionId, ownerId],
     ]);
     expect(writesCompanions().map(([, params]) => params)).toEqual([[sessionId, taggedId]]);
+  });
+
+  it("adds photos and clears companion tags in the same edit with no metadata change", async () => {
+    await caller(ownerId).update({ id: sessionId, addPhotoPaths: [photoPath], companionIds: [] });
+    expect(statements()).toContain("delete from `session_companions` where `session_companions`.`sessionId` = ?");
+    expect(writesPhotos().map(([, params]) => params)).toEqual([[sessionId, ownerId, photoPath]]);
   });
 
   it("replaces tags, clears them with an empty array, and leaves them alone when omitted", async () => {
@@ -140,6 +163,7 @@ describe("journal companions", () => {
     expect(await owner.setShares({ id: sessionId, friendIds: [taggedId] })).toEqual([taggedId]);
     expect(await taggedFriend.getById({ id: sessionId })).toMatchObject({
       id: sessionId, isOwner: false, videoUrl: `/api/videos/${sessionId}`,
+      photos: [{ id: 3, url: "/api/photos/3" }],
     });
     expect(await taggedFriend.getSharedWithMe()).toMatchObject([{ id: sessionId }]);
     expect(await taggedFriend.getCompanions({ id: sessionId })).toEqual([]);
