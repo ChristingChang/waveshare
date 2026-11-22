@@ -4,7 +4,10 @@ import { getDb } from "./db.js";
 import { DAILY_PHOTO_UPLOAD_LIMIT, DAILY_UPLOAD_LIMIT, reservePhotoUpload, reserveVideoUpload } from "./videoUploads.js";
 import { photoUploads, users, videoUploads } from "../drizzle/schema.js";
 
-vi.mock("./db.js", () => ({ getDb: vi.fn() }));
+vi.mock("./r2.js", () => ({ withPlaybackUrl: vi.fn() }));
+vi.mock("./db.js", async importOriginal => ({
+  ...(await importOriginal<typeof import("./db.js")>()), getDb: vi.fn(),
+}));
 
 const lock = vi.fn();
 const where = vi.fn(() => ({ for: lock }));
@@ -60,6 +63,25 @@ describe("rolling upload reservations", () => {
 });
 
 describe("rolling photo upload reservations", () => {
+  it.each(["select", "insert"])("explains missing photo tables during %s", async stage => {
+    const error = new Error("Failed query", { cause: { code: "ER_NO_SUCH_TABLE" } });
+    lock.mockResolvedValueOnce([{ id: 42 }]);
+    if (stage === "select") lock.mockRejectedValueOnce(error);
+    else {
+      lock.mockResolvedValueOnce([]);
+      values.mockRejectedValueOnce(error);
+    }
+    await expect(reservePhotoUpload(42, "photo")).rejects.toMatchObject({
+      code: "INTERNAL_SERVER_ERROR", message: expect.stringContaining("drizzle/manual/0005_photos.sql"),
+    });
+  });
+
+  it("preserves unrelated database errors", async () => {
+    const error = new Error("connection refused");
+    lock.mockRejectedValueOnce(error);
+    await expect(reservePhotoUpload(42, "photo")).rejects.toBe(error);
+  });
+
   it("records a photo upload and rejects the 101st in 24 hours", async () => {
     const path = "r2/surf-photos/42/photo-123-0123456789abcdef.jpg";
     lock.mockResolvedValueOnce([{ id: 42 }]).mockResolvedValueOnce([]);

@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { SessionVideo } from "@/components/SessionVideo";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { uploadPhotos } from "@/lib/photoUpload";
+import { uploadErrorMessage } from "@/lib/uploadError";
 
 export default function Edit() {
   const [, params] = useRoute("/edit/:id");
@@ -77,7 +78,7 @@ export default function Edit() {
     try {
       addPhotoPaths = await uploadPhotos(photoFiles, presignPhotoUpload.mutateAsync);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "照片上傳失敗，請稍後重試");
+      toast.error(uploadErrorMessage(error));
       return;
     } finally {
       setUploadingPhotos(false);
