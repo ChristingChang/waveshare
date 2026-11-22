@@ -32,6 +32,26 @@ export const videoUploads = mysqlTable("video_uploads", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [index("video_uploads_user_created_idx").on(table.userId, table.createdAt)]);
 
+export const photoUploads = mysqlTable("photo_uploads", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  photoPath: varchar("photoPath", { length: 512 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("photo_uploads_user_created_idx").on(table.userId, table.createdAt)]);
+
+export const sessionPhotos = mysqlTable("session_photos", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: int("sessionId").notNull(),
+  userId: int("userId").notNull(),
+  photoPath: varchar("photoPath", { length: 512 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  index("session_photos_session_idx").on(table.sessionId),
+  index("session_photos_path_idx").on(table.photoPath),
+]);
+
+export type SessionPhoto = typeof sessionPhotos.$inferSelect;
+
 /**
  * Surf sessions table - stores individual surfing records
  */
