@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { z } from "zod";
-import { MAX_VIDEO_SIZE, deleteR2Video, presignVideo, validateVideoReference, withCurrentVideoUrl } from "./r2.js";
+import { MAX_VIDEO_SIZE, deleteR2Video, presignVideo, validateVideoReference, withPlaybackUrl } from "./r2.js";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -31,13 +31,13 @@ export const appRouter = router({
     // Get recent sessions for home page
     getRecent: protectedProcedure.query(async ({ ctx }) => {
       const { getUserRecentSessions } = await import("./db.js");
-      return (await getUserRecentSessions(ctx.user.id, 3)).map(withCurrentVideoUrl);
+      return (await getUserRecentSessions(ctx.user.id, 3)).map(withPlaybackUrl);
     }),
 
     // Get all sessions
     getAll: protectedProcedure.query(async ({ ctx }) => {
       const { getUserAllSessions } = await import("./db.js");
-      return (await getUserAllSessions(ctx.user.id)).map(withCurrentVideoUrl);
+      return (await getUserAllSessions(ctx.user.id)).map(withPlaybackUrl);
     }),
 
     // Get sessions by date range (for calendar)
@@ -50,7 +50,7 @@ export const appRouter = router({
       )
       .query(async ({ ctx, input }) => {
         const { getUserSessionsByDateRange } = await import("./db.js");
-        return (await getUserSessionsByDateRange(ctx.user.id, input.startDate, input.endDate)).map(withCurrentVideoUrl);
+        return (await getUserSessionsByDateRange(ctx.user.id, input.startDate, input.endDate)).map(withPlaybackUrl);
       }),
 
     // Get single session by ID
@@ -59,7 +59,7 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const { getSessionById } = await import("./db.js");
         const session = await getSessionById(input.id, ctx.user.id);
-        return session ? withCurrentVideoUrl(session) : session;
+        return session ? withPlaybackUrl(session) : session;
       }),
 
     // Create new session
@@ -70,7 +70,6 @@ export const appRouter = router({
           spotName: z.string(),
           spotLat: z.string().optional(),
           spotLng: z.string().optional(),
-          videoUrl: z.string(),
           videoPath: z.string(),
           note: z.string().optional(),
           boardType: z.string().optional(),
@@ -79,13 +78,14 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        validateVideoReference(ctx.user.id, input.videoPath, input.videoUrl);
+        validateVideoReference(ctx.user.id, input.videoPath);
         const { createSurfSession, addSessionCompanions } = await import("./db.js");
         const { companionIds, ...sessionData } = input;
         
         const result = await createSurfSession({
           userId: ctx.user.id,
           ...sessionData,
+          videoUrl: "",
         });
         
         // Add companions if provided
@@ -101,7 +101,6 @@ export const appRouter = router({
         z.object({
           id: z.number(),
           videoPath: z.string().optional(),
-          videoUrl: z.string().optional(),
           date: z.string().optional(),
           spotName: z.string().optional(),
           spotLat: z.string().optional(),
@@ -110,18 +109,17 @@ export const appRouter = router({
           boardType: z.string().optional(),
           waveQuality: z.number().min(1).max(5).optional(),
           companionIds: z.array(z.number()).optional(),
-        }).refine(data => (data.videoPath === undefined) === (data.videoUrl === undefined), {
-          message: "請同時提供影片網址與路徑",
         })
       )
       .mutation(async ({ ctx, input }) => {
         const { id, companionIds, ...updates } = input;
-        if (input.videoPath !== undefined && input.videoUrl !== undefined) {
-          validateVideoReference(ctx.user.id, input.videoPath, input.videoUrl);
+        if (input.videoPath !== undefined) {
+          validateVideoReference(ctx.user.id, input.videoPath);
         }
         const { updateSurfSession } = await import("./db.js");
         
-        const result = await updateSurfSession(id, ctx.user.id, updates);
+        const result = await updateSurfSession(id, ctx.user.id,
+          input.videoPath === undefined ? updates : { ...updates, videoUrl: "" });
         
         // Note: Companions feature is prepared but not fully integrated
         // Will be completed in future update

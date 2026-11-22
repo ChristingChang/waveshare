@@ -86,7 +86,7 @@ export default function Upload() {
     setUploading(true);
 
     try {
-      const { uploadUrl, videoUrl, videoPath } = await presignUpload.mutateAsync({
+      const { uploadUrl, videoPath } = await presignUpload.mutateAsync({
         contentType: videoFile.type as "video/mp4" | "video/quicktime" | "video/webm",
         size: videoFile.size,
       });
@@ -104,7 +104,6 @@ export default function Upload() {
       await createSession.mutateAsync({
         date,
         spotName: spotName.trim(),
-        videoUrl,
         videoPath,
         boardType: boardType.trim() || undefined,
         note: note.trim() || undefined,
