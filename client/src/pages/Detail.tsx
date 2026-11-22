@@ -18,6 +18,8 @@ import { toast } from "sonner";
 import { SessionVideo } from "@/components/SessionVideo";
 import { SessionPhotos } from "@/components/SessionPhotos";
 import { SessionShares } from "@/components/SessionShares";
+import { ShareCardButton } from "@/components/ShareCardButton";
+import { makeRecordCard } from "@/lib/shareCards";
 
 export default function Detail() {
   const [, params] = useRoute("/detail/:id");
@@ -174,6 +176,11 @@ export default function Detail() {
         {/* Details */}
         <Card className="bg-card">
           <CardContent className="pt-6 space-y-4">
+            {session.isOwner && (
+              <div className="flex justify-end">
+                <ShareCardButton card={makeRecordCard(session)} />
+              </div>
+            )}
             {/* Wave Quality */}
             <div>
               <div className="text-sm text-muted-foreground mb-2">浪況評分</div>
