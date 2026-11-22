@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { TRPCClientError } from "@trpc/client";
+import { PhotoPicker } from "@/components/PhotoPicker";
+import { uploadPhotos } from "@/lib/photoUpload";
 
 export default function Upload() {
   const [, setLocation] = useLocation();
@@ -28,11 +30,13 @@ export default function Upload() {
   const [boardType, setBoardType] = useState("");
   const [waveQuality, setWaveQuality] = useState(3);
   const [note, setNote] = useState("");
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const utils = trpc.useUtils();
   const presignUpload = trpc.surfSessions.presignUpload.useMutation();
+  const presignPhotoUpload = trpc.surfSessions.presignPhotoUpload.useMutation();
   const createSession = trpc.surfSessions.create.useMutation({
     onSuccess: () => {
       utils.surfSessions.invalidate();
@@ -73,11 +77,6 @@ export default function Upload() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!videoFile) {
-      toast.error("請選擇影片");
-      return;
-    }
-
     if (!spotName.trim()) {
       toast.error("請輸入浪點名稱");
       return;
@@ -86,25 +85,31 @@ export default function Upload() {
     setUploading(true);
 
     try {
-      const { uploadUrl, videoPath } = await presignUpload.mutateAsync({
-        contentType: videoFile.type as "video/mp4" | "video/quicktime" | "video/webm",
-        size: videoFile.size,
-      });
-      const uploadResponse = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": videoFile.type },
-        body: videoFile,
-      });
+      let videoPath: string | undefined;
+      if (videoFile) {
+        const presigned = await presignUpload.mutateAsync({
+          contentType: videoFile.type as "video/mp4" | "video/quicktime" | "video/webm",
+          size: videoFile.size,
+        });
+        const uploadResponse = await fetch(presigned.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": videoFile.type },
+          body: videoFile,
+        });
 
-      if (!uploadResponse.ok) {
-        throw new Error("影片上傳失敗，請稍後重試；若持續發生，請聯絡管理員檢查儲存服務設定");
+        if (!uploadResponse.ok) {
+          throw new Error("影片上傳失敗，請稍後重試；若持續發生，請聯絡管理員檢查儲存服務設定");
+        }
+        videoPath = presigned.videoPath;
       }
+      const photoPaths = await uploadPhotos(photoFiles, presignPhotoUpload.mutateAsync);
 
       // Create session record
       await createSession.mutateAsync({
         date,
         spotName: spotName.trim(),
         videoPath,
+        photoPaths,
         boardType: boardType.trim() || undefined,
         note: note.trim() || undefined,
         waveQuality,
@@ -112,7 +117,7 @@ export default function Upload() {
     } catch (error) {
       console.error("Upload error:", error);
       toast.error(error instanceof TRPCClientError && error.data?.code === "TOO_MANY_REQUESTS"
-        ? error.message : error instanceof Error && error.message.includes("影片")
+        ? error.message : error instanceof Error && /影片|照片/.test(error.message)
         ? error.message : "上傳失敗，請檢查網路連線後重試");
       setUploading(false);
     }
@@ -141,7 +146,7 @@ export default function Upload() {
               {/* Video Upload */}
               <div className="space-y-2">
                 <Label htmlFor="video" className="text-card-foreground">
-                  影片 <span className="text-destructive">*</span>
+                  影片 <span className="text-sm text-muted-foreground">(選填)</span>
                 </Label>
                 {videoPreview ? (
                   <div className="relative">
@@ -181,6 +186,8 @@ export default function Upload() {
                   className="hidden"
                 />
               </div>
+
+              <PhotoPicker files={photoFiles} onFilesChange={setPhotoFiles} disabled={uploading} />
 
               {/* Date */}
               <div className="space-y-2">

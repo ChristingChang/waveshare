@@ -14,6 +14,7 @@ vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl: vi.fn() }));
 vi.mock("./db.js", () => ({
   createSurfSession: vi.fn(), deleteSurfSession: vi.fn(), updateSurfSession: vi.fn(), addSessionCompanions: vi.fn(), isVideoPathReferenced: vi.fn(),
   getUserRecentSessions: vi.fn(), getUserAllSessions: vi.fn(), getUserSessionsByDateRange: vi.fn(), getSessionById: vi.fn(),
+  getSessionPhotos: vi.fn(async () => []), removeSessionPhotos: vi.fn(async () => []), addSessionPhotos: vi.fn(), isPhotoPathReferenced: vi.fn(),
 }));
 vi.mock("./_core/env.js", () => ({ ENV: {
   r2AccountId: "test-account", r2AccessKeyId: "test-key", r2SecretAccessKey: "test-secret",
@@ -43,7 +44,12 @@ describe("session reads return a private playback URL", () => {
     { name: "getRecent", read: () => caller.surfSessions.getRecent().then(rows => rows[0]) },
     { name: "getAll", read: () => caller.surfSessions.getAll().then(rows => rows[0]) },
     { name: "getByDateRange", read: () => caller.surfSessions.getByDateRange({ startDate: "2025-01-01", endDate: "2025-12-31" }).then(rows => rows[0]) },
-    { name: "getById", read: () => caller.surfSessions.getById({ id: 7 }) },
+    { name: "getById", read: () => caller.surfSessions.getById({ id: 7 }).then(row => {
+      if (!row) return row;
+      const { photos, ...rest } = row;
+      expect(photos).toEqual([]);
+      return rest;
+    }) },
   ];
 
   function mockReads(row = storedSession) {
@@ -243,9 +249,21 @@ describe("session video ownership", () => {
 
   it("accepts an owned path on create and update and never stores a public URL", async () => {
     await caller.surfSessions.create({ ...session, videoUrl: "https://evil.example.com/video.mp4" } as never);
-    expect(createSurfSession).toHaveBeenCalledWith({ ...session, userId: 42, videoUrl: "" });
+    expect(createSurfSession).toHaveBeenCalledWith({ ...session, userId: 42, videoUrl: "" }, []);
     await caller.surfSessions.update({ id: 7, videoPath, videoUrl: "https://evil.example.com/video.mp4" } as never);
     expect(updateSurfSession).toHaveBeenCalledWith(7, 42, { videoPath, videoUrl: "" });
+  });
+
+  it("creates a record without a video", async () => {
+    const { videoPath: _videoPath, ...withoutVideo } = session;
+    await caller.surfSessions.create(withoutVideo);
+    expect(createSurfSession).toHaveBeenCalledWith({ ...withoutVideo, userId: 42, videoPath: "", videoUrl: "" }, []);
+    await expect(caller.surfSessions.update({ id: 7, videoPath: "" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("returns no playback link for a record without a video", async () => {
+    vi.mocked(getSessionById).mockResolvedValueOnce({ id: 7, userId: 42, videoPath: "", videoUrl: "" } as never);
+    expect(await caller.surfSessions.getById({ id: 7 })).toMatchObject({ videoUrl: "", photos: [] });
   });
 
   it("allows metadata-only updates without replacing legacy videos", async () => {
@@ -258,7 +276,6 @@ describe("session video ownership", () => {
     videoPath.replace("/42/", "/420/"),
     "r2/surf-videos/42/../43/video-123-0123456789abcdef.mp4",
     "surf-videos/42/video-123-0123456789abcdef.mp4",
-    "",
   ])("rejects invalid paths on create and update: %s", async invalid => {
     await expect(caller.surfSessions.create({ ...session, videoPath: invalid })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(caller.surfSessions.update({ id: 7, videoPath: invalid })).rejects.toMatchObject({ code: "BAD_REQUEST" });

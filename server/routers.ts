@@ -4,6 +4,10 @@ import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { z } from "zod";
 import { MAX_VIDEO_SIZE, deleteR2Video, presignVideo, validateVideoReference, withPlaybackUrl } from "./r2.js";
+import { MAX_PHOTOS_PER_SESSION, MAX_PHOTO_SIZE, deleteUnreferencedPhotos, presignPhoto, toPhotoView, validatePhotoPaths } from "./photos.js";
+import { TRPCError } from "@trpc/server";
+
+const photoPathsInput = z.array(z.string()).max(MAX_PHOTOS_PER_SESSION);
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -27,6 +31,13 @@ export const appRouter = router({
         size: z.number().int().positive().max(MAX_VIDEO_SIZE),
       }))
       .mutation(({ ctx, input }) => presignVideo(ctx.user.id, input.contentType, input.size)),
+
+    presignPhotoUpload: protectedProcedure
+      .input(z.object({
+        contentType: z.enum(["image/jpeg", "image/png", "image/heic", "image/heif"]),
+        size: z.number().int().positive().max(MAX_PHOTO_SIZE),
+      }))
+      .mutation(({ ctx, input }) => presignPhoto(ctx.user.id, input.contentType, input.size)),
 
     // Get recent sessions for home page
     getRecent: protectedProcedure.query(async ({ ctx }) => {
@@ -57,9 +68,11 @@ export const appRouter = router({
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        const { getSessionById } = await import("./db.js");
+        const { getSessionById, getSessionPhotos } = await import("./db.js");
         const session = await getSessionById(input.id, ctx.user.id);
-        return session ? withPlaybackUrl(session) : session;
+        if (!session) return session;
+        const photos = await getSessionPhotos(session.id, ctx.user.id);
+        return { ...withPlaybackUrl(session), photos: photos.map(toPhotoView) };
       }),
 
     // Create new session
@@ -70,7 +83,8 @@ export const appRouter = router({
           spotName: z.string(),
           spotLat: z.string().optional(),
           spotLng: z.string().optional(),
-          videoPath: z.string(),
+          videoPath: z.string().optional(),
+          photoPaths: photoPathsInput.optional(),
           note: z.string().optional(),
           boardType: z.string().optional(),
           waveQuality: z.number().min(1).max(5),
@@ -78,15 +92,18 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        validateVideoReference(ctx.user.id, input.videoPath);
-        const { createSurfSession, addSessionCompanions } = await import("./db.js");
-        const { companionIds, ...sessionData } = input;
+        if (input.videoPath) validateVideoReference(ctx.user.id, input.videoPath);
+        const photoPaths = input.photoPaths ?? [];
+        validatePhotoPaths(ctx.user.id, photoPaths);
+        const { createSurfSession } = await import("./db.js");
+        const { companionIds, photoPaths: _photoPaths, ...sessionData } = input;
         
         const result = await createSurfSession({
           userId: ctx.user.id,
           ...sessionData,
+          videoPath: input.videoPath ?? "",
           videoUrl: "",
-        });
+        }, photoPaths);
         
         // Add companions if provided
         // Note: For now, companions feature is prepared but not fully integrated
@@ -109,17 +126,35 @@ export const appRouter = router({
           boardType: z.string().optional(),
           waveQuality: z.number().min(1).max(5).optional(),
           companionIds: z.array(z.number()).optional(),
+          addPhotoPaths: photoPathsInput.optional(),
+          removePhotoIds: z.array(z.number().int().positive()).max(MAX_PHOTOS_PER_SESSION).optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const { id, companionIds, ...updates } = input;
+        const { id, companionIds, addPhotoPaths = [], removePhotoIds = [], ...updates } = input;
         if (input.videoPath !== undefined) {
           validateVideoReference(ctx.user.id, input.videoPath);
         }
-        const { updateSurfSession } = await import("./db.js");
+        validatePhotoPaths(ctx.user.id, addPhotoPaths);
+        const { updateSurfSession, getSessionById, getSessionPhotos, addSessionPhotos, removeSessionPhotos } = await import("./db.js");
+
+        let removedPhotoPaths: string[] = [];
+        if (addPhotoPaths.length || removePhotoIds.length) {
+          if (!await getSessionById(id, ctx.user.id)) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "找不到此紀錄" });
+          }
+          const current = await getSessionPhotos(id, ctx.user.id);
+          const kept = current.filter(photo => !removePhotoIds.includes(photo.id)).length;
+          if (kept + addPhotoPaths.length > MAX_PHOTOS_PER_SESSION) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `每筆紀錄最多 ${MAX_PHOTOS_PER_SESSION} 張照片` });
+          }
+          removedPhotoPaths = (await removeSessionPhotos(id, ctx.user.id, removePhotoIds)).map(photo => photo.photoPath);
+          await addSessionPhotos(id, ctx.user.id, addPhotoPaths);
+        }
         
-        const result = await updateSurfSession(id, ctx.user.id,
-          input.videoPath === undefined ? updates : { ...updates, videoUrl: "" });
+        const fields = input.videoPath === undefined ? updates : { ...updates, videoUrl: "" };
+        const result = Object.keys(fields).length ? await updateSurfSession(id, ctx.user.id, fields) : undefined;
+        await deleteUnreferencedPhotos(ctx.user.id, removedPhotoPaths);
         
         // Note: Companions feature is prepared but not fully integrated
         // Will be completed in future update
@@ -131,7 +166,7 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const { deleteSurfSession, getSessionById, isVideoPathReferenced } = await import("./db.js");
+        const { deleteSurfSession, getSessionById, isVideoPathReferenced, removeSessionPhotos } = await import("./db.js");
         
         // Get session to retrieve video path for deletion
         const session = await getSessionById(input.id, ctx.user.id);
@@ -140,10 +175,12 @@ export const appRouter = router({
         }
         
         // Delete from database
+        const photos = await removeSessionPhotos(input.id, ctx.user.id);
         await deleteSurfSession(input.id, ctx.user.id);
+        await deleteUnreferencedPhotos(ctx.user.id, photos.map(photo => photo.photoPath));
         
         try {
-          if (!await isVideoPathReferenced(session.videoPath)) {
+          if (session.videoPath && !await isVideoPathReferenced(session.videoPath)) {
             await deleteR2Video(ctx.user.id, session.videoPath);
           }
         } catch (error) {

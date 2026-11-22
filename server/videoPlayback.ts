@@ -6,8 +6,8 @@ import { isR2SessionVideo, presignVideoPlayback } from "./r2.js";
 
 type SessionVideo = { id: number; userId: number; videoPath: string; videoUrl: string };
 
-// Single place that decides who may play a session's video; per-friend sharing extends this.
-export function canViewSessionVideo(viewer: Pick<User, "id">, session: Pick<SessionVideo, "userId">) {
+// Single place that decides who may see a session's video and photos; per-friend sharing extends this.
+export function canViewSessionVideo(viewer: Pick<User, "id">, session: Pick<SessionVideo, "userId"> & Partial<Pick<SessionVideo, "id">>) {
   return viewer.id === session.userId;
 }
 
