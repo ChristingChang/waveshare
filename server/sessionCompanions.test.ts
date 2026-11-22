@@ -19,24 +19,48 @@ function caller(userId: number) {
 beforeEach(() => {
   vi.stubEnv("DATABASE_URL", "mysql://user:password@127.0.0.1/waveshare");
   query.mockReset();
+  let shared = false;
+  const sessionRow = [
+    sessionId, ownerId, date, record.spotName, null, null, "", videoPath,
+    null, null, record.waveQuality, new Date(), new Date(),
+  ];
   query.mockImplementation(async ({ sql }: { sql: string }, params: unknown[]) => {
-    if (sql.startsWith("select") && sql.includes("from `friendships`")) {
-      expect(sql).toContain("`friendships`.`status` = ?");
-      expect(params).toEqual([ownerId, ownerId, ownerId, ownerId, "accepted"]);
-      return [[[1, taggedId, ownerId, "accepted", "小安", null]]];
-    }
     if (sql.startsWith("select") && sql.includes("from `session_companions`")) {
       expect(sql).toContain("inner join `surf_sessions`");
       expect(sql).toContain("`surf_sessions`.`userId` = ?");
       expect(params[0]).toBe(sessionId);
       return [params[1] === ownerId ? [[taggedId, "小安", null]] : []];
     }
+    if (sql.startsWith("select") && sql.includes("from `session_shares`")) {
+      expect(sql).toContain("`session_shares`.`friendId` = ?");
+      expect(sql).toContain("`friendships`.`status` = ?");
+      expect(sql).not.toContain("`session_companions`");
+      expect(params).toEqual(sql.includes("`surf_sessions`.`id` = ?")
+        ? [taggedId, sessionId, "accepted", taggedId, taggedId]
+        : [taggedId, "accepted", taggedId, taggedId]);
+      return [shared ? [[...sessionRow, "小浪"]] : []];
+    }
+    if (sql.startsWith("select") && sql.includes("from `friendships`")) {
+      expect(sql).toContain("`friendships`.`status` = ?");
+      if (!sql.includes("left join")) {
+        expect(params).toEqual(["accepted", ownerId, ownerId]);
+        return [[[1, taggedId, ownerId, "accepted", new Date(), new Date()]]];
+      }
+      expect(params).toEqual([ownerId, ownerId, ownerId, ownerId, "accepted"]);
+      return [[[1, taggedId, ownerId, "accepted", "小安", null]]];
+    }
     if (sql.startsWith("select") && sql.includes("from `surf_sessions`")) {
       expect(sql).toContain("`surf_sessions`.`userId` = ?");
-      if (sql.endsWith("for update")) return [params[1] === ownerId ? [[sessionId]] : []];
+      if (sql.endsWith("for update")) return [params[1] === ownerId ? [sessionRow] : []];
       const ownerParam = sql.includes("`surf_sessions`.`id` = ?") ? 1 : 0;
+      if (ownerParam && params[ownerParam] === ownerId) return [[sessionRow]];
       expect(params[ownerParam]).toBe(taggedId);
       return [[]];
+    }
+    if (sql.startsWith("delete from `session_shares`")) shared = false;
+    if (sql.startsWith("insert into `session_shares`")) {
+      expect(params).toEqual([sessionId, taggedId]);
+      shared = true;
     }
     return [{ insertId: sessionId, affectedRows: 1 }];
   });
@@ -105,5 +129,23 @@ describe("journal companions", () => {
     expect(await taggedFriend.getAll()).toEqual([]);
     expect(await taggedFriend.getRecent()).toEqual([]);
     expect(await taggedFriend.getByDateRange({ startDate: date, endDate: date })).toEqual([]);
+    expect(await taggedFriend.getSharedWithMe()).toEqual([]);
+  });
+
+  it("lets a tagged friend see the record only while it is explicitly shared", async () => {
+    const owner = caller(ownerId);
+    const taggedFriend = caller(taggedId);
+    expect(await taggedFriend.getById({ id: sessionId })).toBeUndefined();
+
+    expect(await owner.setShares({ id: sessionId, friendIds: [taggedId] })).toEqual([taggedId]);
+    expect(await taggedFriend.getById({ id: sessionId })).toMatchObject({
+      id: sessionId, isOwner: false, videoUrl: `/api/videos/${sessionId}`,
+    });
+    expect(await taggedFriend.getSharedWithMe()).toMatchObject([{ id: sessionId }]);
+    expect(await taggedFriend.getCompanions({ id: sessionId })).toEqual([]);
+
+    await owner.setShares({ id: sessionId, friendIds: [] });
+    expect(await taggedFriend.getById({ id: sessionId })).toBeUndefined();
+    expect(await owner.getCompanions({ id: sessionId })).toEqual([{ companionId: taggedId, name: "小安", email: null }]);
   });
 });
