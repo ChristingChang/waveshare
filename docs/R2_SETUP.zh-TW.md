@@ -2,7 +2,7 @@
 
 完成後，影片會從您的瀏覽器直接傳到 Cloudflare R2，不會經過 Vercel 的 4.5 MB 限制。本程式接受 MP4、MOV、WebM，單支影片最多 100 MiB。
 
-**先提醒：這是公開播放的儲存空間。** 知道影片網址的人都能觀看，不適合放私人或敏感影片。上傳網址有效 10 分鐘，請勿分享；Cloudflare 可能需要付款方式，使用量超過免費額度會收費。
+**影片只有紀錄的主人能播放。** WaveShare 先確認登入的是紀錄本人，才給一個 15 分鐘有效的播放連結；所以儲存空間本身必須關閉公開存取（第 2 步）。上傳網址有效 10 分鐘，請勿分享；Cloudflare 可能需要付款方式，使用量超過免費額度會收費。
 
 ## 1. 開帳號、建立儲存空間
 
@@ -11,12 +11,14 @@
 3. 按 **Create bucket**，名稱可填 `waveshare-videos`，記下名稱，這就是 `R2_BUCKET`。
 4. 使用一般預設位置；本程式未設定 EU、US 或 FedRAMP 等特定司法管轄區的獨立連線端點。不要選需此類端點的 bucket。
 
-## 2. 取得公開播放網址
+## 2. 關閉公開存取
 
-1. 點進剛建立的 bucket → **Settings**。
-2. 在 **Public Development URL** 按 **Enable**，輸入 `allow` 並確認 **Allow**。
-3. 複製顯示的 **Public Bucket URL**（例如 `https://pub-你的代碼.r2.dev`），這就是 `R2_PUBLIC_URL`；不要填 S3 API 的 `r2.cloudflarestorage.com` 網址。
-4. `r2.dev` 是有流量限制的開發用途網址。正式服務建議在相同 Settings 的 **Custom Domains** 綁定由 Cloudflare 管理的網域，再把 `R2_PUBLIC_URL` 改成該 HTTPS 網址。不要自行把 CNAME 指到 `r2.dev`。
+WaveShare 不再使用公開播放網址。舊版教學曾要求開啟公開網址；只要它還開著，舊的公開影片網址仍然誰都能播放。新建立的 bucket 預設不公開，仍請檢查一次：
+
+1. 點進 bucket → **Settings**。
+2. **Public Development URL**（`r2.dev` 網址）：若顯示已啟用（Enabled），按 **Disable** 並依畫面確認。應顯示為停用。
+3. **Custom Domains**：若有連到這個 bucket 的自訂網域，逐一從該網域的選單停用（Disable）或移除（Remove）。清單應該是空的。
+4. 回到 WaveShare 用過的舊公開影片網址（例如 `https://pub-你的代碼.r2.dev/r2/surf-videos/...`），在瀏覽器打開，應無法播放。Cloudflare 介面名稱可能會更新，以「不讓任何網址公開讀取這個 bucket」為準。
 
 ## 3. 允許您的網站上傳（CORS）
 
@@ -52,7 +54,7 @@
 ## 5. 填進 Vercel，再重新部署
 
 1. 打開 Vercel 專案 → **Settings → Environment Variables**。
-2. 加入以下五個變數，值不要加引號：
+2. 加入以下四個變數，值不要加引號：
 
 | 名稱 | 填什麼 |
 |---|---|
@@ -60,17 +62,21 @@
 | `R2_ACCESS_KEY_ID` | 第 4 步的 Access Key ID |
 | `R2_SECRET_ACCESS_KEY` | 第 4 步的 Secret Access Key |
 | `R2_BUCKET` | bucket 名稱，例如 `waveshare-videos` |
-| `R2_PUBLIC_URL` | 第 2 步的公開 HTTPS 播放網址 |
 
-3. 勾選您要使用的環境（Production，以及需要時的 Preview / Development）。這五個變數都由伺服器讀取，瀏覽器不會拿到帳號鑰匙，只會拿到短效上傳網址與播放網址。
+3. 勾選您要使用的環境（Production，以及需要時的 Preview / Development）。這四個變數都由伺服器讀取，瀏覽器不會拿到帳號鑰匙，只會拿到短效的上傳網址與播放連結。
+   若以前設定過 `R2_PUBLIC_URL`，程式已不再使用，可以刪除。
 4. 到 **Deployments** 找目前部署，按選單的 **Redeploy**。只儲存變數而沒有重新部署不會更新既有部署。
 5. 本機開發則把相同設定填進 `.env`，並依 `.env.example` 填妥資料庫與 OAuth 設定，重新啟動 `pnpm dev`。
 
 ## 6. 試一次
 
-登入 WaveShare，上傳一段小影片並播放；再用一段超過 4.5 MB、但不超過 100 MiB 的影片確認直接上傳。若失敗，先確認五個變數、CORS 的網站網址、token 的 bucket 範圍，以及是否已重新部署。
+1. 登入 WaveShare，上傳一段小影片並播放；再用一段超過 4.5 MB、但不超過 100 MiB 的影片確認直接上傳。
+2. 在詳細頁播放影片時，影片網址是 `/api/videos/<紀錄編號>`。把這個網址貼到未登入的視窗，應顯示「請先登入」；用另一個帳號打開，應顯示「找不到影片」。
+3. 確認第 2 步已關閉公開存取：舊的 `r2.dev` 或自訂網域影片網址應無法播放。
 
-影片內容不會經過應用伺服器掃描；目前檢查的是申報的格式與大小，不是防毒或完整影片檢驗。R2 新影片使用 `r2/surf-videos/<使用者編號>/video-...` 路徑，播放網址會依目前的 `R2_PUBLIC_URL` 組合。既有 `surf-videos/...` 路徑保留原播放網址，不會自動搬到 R2；仍可只編輯文字資料。刪除紀錄時會一併嘗試刪除該使用者的 R2 影片；儲存服務刪除失敗會記錄錯誤，不影響紀錄刪除，可在 Cloudflare 手動整理。Forge 影片不會被刪除。
+若失敗，先確認四個變數、CORS 的網站網址、token 的 bucket 範圍，以及是否已重新部署。
+
+影片內容不會經過應用伺服器掃描；目前檢查的是申報的格式與大小，不是防毒或完整影片檢驗。R2 新影片使用 `r2/surf-videos/<使用者編號>/video-...` 路徑。播放時 WaveShare 確認是紀錄本人，才轉到 15 分鐘有效的 R2 播放連結；連結在播放途中過期時，播放器會自動重新取得一次並從原處接著播。之前上傳到 R2 的影片不用搬移，同樣改用這種方式播放。既有 `surf-videos/...` 路徑的舊 Forge 影片不會自動搬到 R2，也只有本人能從 WaveShare 打開；但 Forge 原網址本身是否公開，未確認。仍可只編輯文字資料。刪除紀錄時會一併嘗試刪除該使用者的 R2 影片；儲存服務刪除失敗會記錄錯誤，不影響紀錄刪除，可在 Cloudflare 手動整理。Forge 影片不會被刪除。
 
 ## 上傳次數限制
 
