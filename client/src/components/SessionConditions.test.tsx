@@ -19,6 +19,12 @@ const snapshot: ConditionsSnapshot = {
   fetchedAt: "2026-11-22T01:00:00Z",
 };
 describe("condition row", () => {
+  it("supports readable inverse colors and full-width grid placement", () => {
+    const { container } = render(<SessionConditions conditions={JSON.stringify(snapshot)} className="col-span-2 text-primary-foreground/90" />);
+    expect(container.firstElementChild?.classList.contains("text-muted-foreground")).toBe(false);
+    expect(container.firstElementChild?.classList.contains("text-primary-foreground/90")).toBe(true);
+    expect(container.firstElementChild?.classList.contains("col-span-2")).toBe(true);
+  });
   it("renders compact values, source titles, tide times and daytime mode", () => {
     render(<SessionConditions conditions={JSON.stringify(snapshot)} />);
     expect(screen.getByText("浪高 1–2 m").title).toBe("中央氣象署");

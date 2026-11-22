@@ -100,10 +100,9 @@ export default function Home() {
               <div className="space-y-3">
                 {recentSessions.map((session) => (
                   <Link key={session.id} href={`/detail/${session.id}`}>
-                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-accent transition-colors cursor-pointer">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 p-3 rounded-lg hover:bg-accent transition-colors cursor-pointer">
                       <div className="flex-1">
                         <div className="font-medium text-foreground">{session.spotName}</div>
-                        <SessionConditions conditions={session.conditions} />
                         <div className="text-sm text-muted-foreground">
                           {formatDate(session.date)}
                         </div>
@@ -111,6 +110,7 @@ export default function Home() {
                       <div className="flex gap-0.5">
                         {renderStars(session.waveQuality)}
                       </div>
+                      <SessionConditions conditions={session.conditions} className="col-span-2" />
                     </div>
                   </Link>
                 ))}
