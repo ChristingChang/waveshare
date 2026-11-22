@@ -1,4 +1,5 @@
 import { Waves, Timer, Compass, Wind, ArrowUp, ArrowDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type {
   ConditionsSnapshot,
   ConditionValue,
@@ -17,8 +18,10 @@ const bearing = (v: ConditionDirection) =>
 
 export function SessionConditions({
   conditions,
+  className,
 }: {
   conditions?: string | null;
+  className?: string;
 }) {
   let snapshot: ConditionsSnapshot;
   try {
@@ -50,7 +53,7 @@ export function SessionConditions({
   if (!sources.length) return null;
   const icon = "h-3.5 w-3.5 shrink-0";
   return (
-    <div className="mt-2 text-xs text-muted-foreground" aria-label="自動浪況">
+    <div className={cn("mt-2 text-xs text-muted-foreground", className)} aria-label="自動浪況">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 [&>span]:inline-flex [&>span]:items-center [&>span]:gap-1">
         {waveHeight && (
           <span title={waveHeight.source}>
