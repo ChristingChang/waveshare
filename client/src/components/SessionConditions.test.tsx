@@ -19,6 +19,11 @@ const snapshot: ConditionsSnapshot = {
   fetchedAt: "2026-11-22T01:00:00Z",
 };
 describe("condition row", () => {
+  it("rounds legacy fractional degrees to integer bearings", () => {
+    render(<SessionConditions conditions={JSON.stringify({...snapshot, swellDirection: {degrees: 36.4, source: "Open-Meteo"}})} />);
+    expect(screen.getByText("湧浪 東北 36°")).toBeTruthy();
+    expect(screen.queryByText(/36\.4°/)).toBeNull();
+  });
   it("supports readable inverse colors and full-width grid placement", () => {
     const { container } = render(<SessionConditions conditions={JSON.stringify(snapshot)} className="col-span-2 text-primary-foreground/90" />);
     expect(container.firstElementChild?.classList.contains("text-muted-foreground")).toBe(false);

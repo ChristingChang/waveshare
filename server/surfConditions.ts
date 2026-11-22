@@ -219,7 +219,7 @@ export function aggregate(
       y = values.reduce((s, v) => s + Math.sin((v * Math.PI) / 180), 0);
     if (Math.hypot(x, y) < 1e-8) return null;
     return {
-      degrees: ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360,
+      degrees: Math.round(((Math.atan2(y, x) * 180) / Math.PI + 360) % 360) % 360,
       source,
     };
   }
