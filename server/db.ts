@@ -181,6 +181,21 @@ export async function getSessionById(sessionId: number, userId: number) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function getSessionVideo(sessionId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const { surfSessions } = await import("../drizzle/schema.js");
+
+  const result = await db
+    .select({ id: surfSessions.id, userId: surfSessions.userId, videoPath: surfSessions.videoPath, videoUrl: surfSessions.videoUrl })
+    .from(surfSessions)
+    .where(eq(surfSessions.id, sessionId))
+    .limit(1);
+
+  return result[0];
+}
+
 // Create new surf session
 export async function createSurfSession(session: {
   userId: number;

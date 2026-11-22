@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { SessionVideo } from "@/components/SessionVideo";
 
 export default function Edit() {
   const [, params] = useRoute("/edit/:id");
@@ -123,7 +124,7 @@ export default function Edit() {
               {/* Video Preview (Read-only) */}
               <div className="space-y-2">
                 <Label className="text-card-foreground">影片</Label>
-                <video
+                <SessionVideo
                   src={session.videoUrl}
                   controls
                   className="w-full rounded-lg bg-black"
