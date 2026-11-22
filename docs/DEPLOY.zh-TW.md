@@ -20,7 +20,7 @@
 
 ## 2. 在 Vercel 建立網站
 
-1. 到 <https://vercel.com/new> 登入並匯入 WaveShare 儲存庫。若分支尚未合併，請確認部署的是包含此功能的分支。
+1. 到 <https://vercel.com/new> 登入並匯入 WaveShare 儲存庫，確認正式部署使用主分支（`main`）。
 2. 使用專案內的 `vercel.json`：安裝指令 `pnpm install`、建置指令 `pnpm build`、輸出資料夾 `dist/public`。API 由 `api/index.ts` 處理，網頁路徑由 SPA fallback 處理。
 3. 記下預定使用的正式網址，例如 `https://waveshare-example.vercel.app`。可以先建立專案取得網址，再填入下列設定並重新部署。尚未設定登入時，登入端點會顯示設定未完成。
 
@@ -100,7 +100,7 @@ pnpm exec drizzle-kit migrate
 ## 7. 重新部署與確認
 
 1. 回到 Vercel **Deployments** → 目前版本 → **Redeploy**。
-2. 開啟網站並點登入，應導向 Google 授權，完成後回到首頁；測試登出、再次登入。
+2. 用未登入的視窗開啟網站，應自動前往 Google 登入與授權，完成後回到首頁；再測試登出與重新登入。
 3. 新增衝浪紀錄並上傳影片，測試播放、編輯與刪除。影片直接上傳 R2，不受 Vercel 約 4.5 MB 的函式請求大小限制。
 4. 每位使用者每滾動 24 小時最多申請 10 次上傳，未完成的申請也會計入。設定 `CRON_SECRET` 後，Vercel 每天呼叫清理路由，細節見 R2 教學。
 
