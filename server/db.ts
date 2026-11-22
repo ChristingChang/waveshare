@@ -5,6 +5,7 @@ import { InsertUser, users } from "../drizzle/schema.js";
 import { databaseConfig } from "./_core/databaseConfig.js";
 import { friendships, sessionShares, surfSessions } from "../drizzle/schema.js";
 import { withPlaybackUrl } from "./r2.js";
+import { TRPCError } from "@trpc/server";
 
 let _db: MySql2Database<Record<string, unknown>> | null = null;
 
@@ -276,7 +277,7 @@ export async function createSurfSession(session: {
     const result = await tx.insert(surfSessions).values(session);
     if (photoPaths.length) {
       const sessionId = result[0].insertId;
-      await tx.insert(sessionPhotos).values(photoPaths.map(photoPath => ({ sessionId, userId: session.userId, photoPath })));
+      await tx.insert(sessionPhotos).values(photoPaths.map(photoPath => ({ sessionId, userId: session.userId, photoPath }))).catch(rethrowPhotoWriteError);
     }
     return result;
   });
@@ -292,6 +293,17 @@ export function isMissingTableError(error: unknown): boolean {
     if (e.errno === 1146 || e.code === "ER_NO_SUCH_TABLE") return true;
   }
   return false;
+}
+
+export function rethrowPhotoWriteError(error: unknown): never {
+  if (isMissingTableError(error)) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "照片功能尚未啟用：資料庫缺少照片資料表，請管理員執行 drizzle/manual/0005_photos.sql",
+      cause: error,
+    });
+  }
+  throw error;
 }
 
 export async function getSessionPhotos(sessionId: number, userId: number) {
@@ -336,7 +348,7 @@ export async function changeSessionPhotos(sessionId: number, userId: number, rem
       await tx.insert(sessionPhotos).values(addPaths.map(photoPath => ({ sessionId, userId, photoPath })));
     }
     return removed;
-  });
+  }).catch(rethrowPhotoWriteError);
 }
 
 // Removes the given photos (or all of the session's photos) and returns the removed rows.
