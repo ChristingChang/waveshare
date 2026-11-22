@@ -29,6 +29,7 @@
 1. 用 Google 帳號開啟 <https://console.cloud.google.com/>，點上方專案選單 → **新增專案（New project）**，命名為 `WaveShare` 並建立，再切換到該專案。
 2. 開啟 **Google Auth Platform**（舊介面為 **APIs & Services → OAuth consent screen**），按 **Get started**。在 **Branding** 填應用程式名稱、使用者支援信箱與聯絡信箱。
 3. **Audience / 使用者類型** 選 **External（外部）**，不是 Internal，讓組織外的 Google 帳號也能登入。在 **Data Access** 只使用基本的 `openid`、`email`、`profile`，不需加入 Gmail 或雲端硬碟權限。
+   在 OAuth 同意畫面（Branding）填入隱私權政策 `https://waveshare-six.vercel.app/privacy` 與服務條款 `https://waveshare-six.vercel.app/terms`，供 Google 審查及使用者閱讀。
 4. 到 **Audience** 按 **Publish app（發布應用程式）** 並確認，讓狀態由 **Testing** 改為 **In production**。只留在測試模式時，只有列出的測試帳號可用；正式公開前必須發布。若 Google 要求品牌或網域驗證，請依控制台提示完成。
 5. 到 **Clients → Create client**（舊介面為 **Credentials → Create credentials → OAuth client ID**），類型選 **Web application（網頁應用程式）**。
 6. **Authorized JavaScript origins（已授權的 JavaScript 來源）** 填網站來源，不含路徑，例如 `https://waveshare-example.vercel.app`。**Authorized redirect URIs（已授權的重新導向 URI）** 填完整 callback：

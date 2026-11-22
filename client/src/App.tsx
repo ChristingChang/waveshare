@@ -55,6 +55,11 @@ function Router() {
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />
         </Switch>
+        <footer className="py-6 text-center text-sm text-muted-foreground">
+          <a href="/privacy" className="underline">隱私權政策</a>
+          {" · "}
+          <a href="/terms" className="underline">服務條款</a>
+        </footer>
       </div>
       <BottomNav />
     </>
