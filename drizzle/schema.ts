@@ -1,4 +1,4 @@
-import { index, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -53,6 +53,13 @@ export const surfSessions = mysqlTable("surf_sessions", {
 
 export type SurfSession = typeof surfSessions.$inferSelect;
 export type InsertSurfSession = typeof surfSessions.$inferInsert;
+
+export const sessionShares = mysqlTable("session_shares", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: int("sessionId").notNull(),
+  friendId: int("friendId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [uniqueIndex("session_shares_session_friend_idx").on(table.sessionId, table.friendId)]);
 
 /**
  * Surf spots table - stores unique surf spot locations

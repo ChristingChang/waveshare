@@ -1,14 +1,13 @@
 import { Router } from "express";
 import type { User } from "../drizzle/schema.js";
 import { sdk } from "./_core/sdk.js";
-import { getSessionVideo } from "./db.js";
+import { canFriendViewSession, getSessionVideo } from "./db.js";
 import { isR2SessionVideo, presignVideoPlayback } from "./r2.js";
 
 type SessionVideo = { id: number; userId: number; videoPath: string; videoUrl: string };
 
-// Single place that decides who may play a session's video; per-friend sharing extends this.
-export function canViewSessionVideo(viewer: Pick<User, "id">, session: Pick<SessionVideo, "userId">) {
-  return viewer.id === session.userId;
+export async function canViewSessionVideo(viewer: Pick<User, "id">, session: Pick<SessionVideo, "id" | "userId">, lookup = canFriendViewSession) {
+  return viewer.id === session.userId || await lookup(session.id, viewer.id);
 }
 
 export const videoPlaybackRouter = Router();
@@ -33,7 +32,7 @@ videoPlaybackRouter.get("/:sessionId", async (req, res) => {
 
   try {
     const session = await getSessionVideo(sessionId);
-    if (!session || !canViewSessionVideo(viewer, session)) {
+    if (!session || !await canViewSessionVideo(viewer, session)) {
       res.status(404).json({ error: "找不到影片" });
       return;
     }
