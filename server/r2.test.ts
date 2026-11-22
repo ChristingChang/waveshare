@@ -15,6 +15,7 @@ vi.mock("./db.js", () => ({
   createSurfSession: vi.fn(), deleteSurfSession: vi.fn(), updateSurfSession: vi.fn(), addSessionCompanions: vi.fn(), isVideoPathReferenced: vi.fn(),
   getUserRecentSessions: vi.fn(), getUserAllSessions: vi.fn(), getUserSessionsByDateRange: vi.fn(), getSessionById: vi.fn(),
   getSessionPhotos: vi.fn(async () => []), removeSessionPhotos: vi.fn(async () => []), addSessionPhotos: vi.fn(), isPhotoPathReferenced: vi.fn(),
+  getSessionsSharedWithUser: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("./_core/env.js", () => ({ ENV: {
   r2AccountId: "test-account", r2AccessKeyId: "test-key", r2SecretAccessKey: "test-secret",
@@ -59,17 +60,17 @@ describe("session reads return a private playback URL", () => {
     vi.mocked(getSessionById).mockResolvedValue(row);
   }
 
-  it.each(readers)("$name never exposes the stored public R2 URL", async ({ read }) => {
+  it.each(readers)("$name never exposes the stored public R2 URL", async ({ name, read }) => {
     mockReads();
-    expect(await read()).toEqual({ ...storedSession, videoUrl: "/api/videos/7" });
+    expect(await read()).toEqual({ ...storedSession, videoUrl: "/api/videos/7", ...(name === "getById" ? { isOwner: true, ownerName: undefined } : {}) });
     expect(storedSession.videoUrl).toBe(`https://pub-old.r2.dev/${videoPath}`);
     expect(getSignedUrl).not.toHaveBeenCalled();
   });
 
-  it.each(readers)("$name routes legacy Forge videos through the same playback check", async ({ read }) => {
+  it.each(readers)("$name routes legacy Forge videos through the same playback check", async ({ name, read }) => {
     const legacy = { ...storedSession, videoPath: "surf-videos/42/video-123-0123456789abcdef.mp4", videoUrl: "https://forge.example.com/legacy.mp4" };
     mockReads(legacy);
-    expect(await read()).toEqual({ ...legacy, videoUrl: "/api/videos/7" });
+    expect(await read()).toEqual({ ...legacy, videoUrl: "/api/videos/7", ...(name === "getById" ? { isOwner: true, ownerName: undefined } : {}) });
   });
 
   it("preserves empty and missing read results", async () => {

@@ -53,7 +53,7 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 
 將輸出保存為 `SESSION_SECRET`。不要公開或加上 `VITE_`。更換此金鑰會讓所有使用者需要重新登入。
 
-影片請完整依照 [R2 設定教學](R2_SETUP.zh-TW.md) 建立 bucket、公開播放網址、CORS 與 bucket 範圍的 Object Read & Write 存取鑰匙。R2 環境變數名稱維持不變；公開網址代表知道網址的人可以觀看影片。
+影片請完整依照 [R2 設定教學](R2_SETUP.zh-TW.md) 建立 bucket、關閉公開存取、設定 CORS，並建立只限該 bucket 的 Object Read & Write 存取鑰匙。影片只有紀錄本人能播放，WaveShare 確認身分後才給 15 分鐘有效的播放連結。**若 bucket 曾開啟 `r2.dev` 公開網址或公開的自訂網域，請到 Cloudflare 關閉**（作法見 R2 教學第 2 步）；沒關之前，舊的公開影片網址仍然誰都能播放。
 
 ## 5. 在 Vercel 填環境變數
 
@@ -72,14 +72,13 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 | `R2_ACCESS_KEY_ID` | 影片功能必填；R2 存取鑰匙 ID |
 | `R2_SECRET_ACCESS_KEY` | 影片功能必填；R2 存取密鑰 |
 | `R2_BUCKET` | 影片功能必填；bucket 名稱 |
-| `R2_PUBLIC_URL` | 影片功能必填；HTTPS 公開播放網址 |
 | `CRON_SECRET` | 選填；另一組至少 16 字元的隨機密碼，啟用每日未使用影片清理；不要與 Session 金鑰共用 |
 | `VITE_APP_TITLE` | 建議填 `WaveShare 浪旅誌`；公開網頁標題 |
 | `VITE_APP_LOGO` | 建議填公開可讀取的圖示網址；非機密 |
 | `PORT` | 只供本機 / 自架使用，預設 3000；Vercel 不需填 |
 | `NODE_ENV` | Vercel 正式部署自動使用 `production`，不需手動填 |
 
-除了 `VITE_APP_TITLE`、`VITE_APP_LOGO`，上述資料都不要放到前端變數。無需設定舊 Manus OAuth、Forge 或分析服務變數。
+除了 `VITE_APP_TITLE`、`VITE_APP_LOGO`，上述資料都不要放到前端變數。`R2_PUBLIC_URL` 已不再使用，以前設定過的可以刪除。無需設定舊 Manus OAuth、Forge 或分析服務變數。
 
 ## 6. 初始化 / 更新資料庫
 
@@ -102,6 +101,7 @@ pnpm exec drizzle-kit migrate
 1. 回到 Vercel **Deployments** → 目前版本 → **Redeploy**。
 2. 用未登入的視窗開啟網站，應自動前往 Google 登入與授權，完成後回到首頁；再測試登出與重新登入。
 3. 新增衝浪紀錄並上傳影片，測試播放、編輯與刪除。影片直接上傳 R2，不受 Vercel 約 4.5 MB 的函式請求大小限制。
+   確認影片只有本人能播放：未登入或用另一個帳號打開 `/api/videos/<紀錄編號>` 會被擋下，舊的 `r2.dev` 公開網址也無法播放。
 4. 每位使用者每滾動 24 小時最多申請 10 次上傳，未完成的申請也會計入。設定 `CRON_SECRET` 後，Vercel 每天呼叫清理路由，細節見 R2 教學。
 
 若登入失敗，先確認 Google redirect URI 完全一致、應用程式已發布為 In production、Secret 無多餘空白、TiDB 遷移已完成，並且已重新部署。不要將登入 code、存取 token、Cookie 或資料庫密碼貼到公開 issue。

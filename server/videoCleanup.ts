@@ -1,6 +1,6 @@
 import { and, eq, notExists, sql } from "drizzle-orm";
 import { photoUploads, sessionPhotos, surfSessions, videoUploads } from "../drizzle/schema.js";
-import { getDb } from "./db.js";
+import { getDb, isMissingTableError } from "./db.js";
 import { deleteR2Photo } from "./photos.js";
 import { deleteR2Video } from "./r2.js";
 
@@ -29,10 +29,16 @@ export async function cleanupUnusedVideos() {
 export async function cleanupUnusedPhotos() {
   const db = await getDb();
   if (!db) throw new Error("Photo cleanup database unavailable");
-  const uploads = await db.select().from(photoUploads).where(and(
+  let uploads;
+  try {
+    uploads = await db.select().from(photoUploads).where(and(
     sql`${photoUploads.createdAt} < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)`,
-    notExists(db.select({ id: sessionPhotos.id }).from(sessionPhotos).where(eq(sessionPhotos.photoPath, photoUploads.photoPath))),
-  )).limit(100);
+      notExists(db.select({ id: sessionPhotos.id }).from(sessionPhotos).where(eq(sessionPhotos.photoPath, photoUploads.photoPath))),
+    )).limit(100);
+  } catch (error) {
+    if (isMissingTableError(error)) return { scanned: 0, deleted: 0, failed: 0 };
+    throw error;
+  }
   let deleted = 0;
   let failed = 0;
   for (const upload of uploads) {

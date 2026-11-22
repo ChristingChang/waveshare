@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "de702d9e-4c81-48b8-978f-15be44d3885b",
+  "id": "1cdce9eb-5fd9-440a-afd6-936b2a171307",
   "prevId": "cf186a00-eada-461d-b015-64869a07edea",
   "tables": {
     "friendships": {
@@ -228,6 +228,61 @@
       "compositePrimaryKeys": {
         "session_photos_id": {
           "name": "session_photos_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "session_shares": {
+      "name": "session_shares",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "sessionId": {
+          "name": "sessionId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "friendId": {
+          "name": "friendId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "session_shares_session_friend_idx": {
+          "name": "session_shares_session_friend_idx",
+          "columns": [
+            "sessionId",
+            "friendId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "session_shares_id": {
+          "name": "session_shares_id",
           "columns": [
             "id"
           ]

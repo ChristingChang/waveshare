@@ -3,9 +3,9 @@ import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { MAX_VIDEO_SIZE, deleteR2Video, presignVideo, validateVideoReference, withPlaybackUrl } from "./r2.js";
 import { MAX_PHOTOS_PER_SESSION, MAX_PHOTO_SIZE, deleteUnreferencedPhotos, presignPhoto, toPhotoView, validatePhotoPaths } from "./photos.js";
-import { TRPCError } from "@trpc/server";
 
 const photoPathsInput = z.array(z.string()).max(MAX_PHOTOS_PER_SESSION);
 
@@ -70,10 +70,35 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const { getSessionById, getSessionPhotos } = await import("./db.js");
         const session = await getSessionById(input.id, ctx.user.id);
-        if (!session) return session;
-        const photos = await getSessionPhotos(session.id, ctx.user.id);
-        return { ...withPlaybackUrl(session), photos: photos.map(toPhotoView) };
+        if (session) {
+          const photos = await getSessionPhotos(session.id, ctx.user.id);
+          return { ...withPlaybackUrl(session), isOwner: true, ownerName: ctx.user.name, photos: photos.map(toPhotoView) };
+        }
+        const { getSessionsSharedWithUser } = await import("./db.js");
+        const [shared] = await getSessionsSharedWithUser(ctx.user.id, input.id);
+        if (!shared) return undefined;
+        const photos = await getSessionPhotos(shared.id, shared.userId);
+        return { ...shared, isOwner: false, photos: photos.map(toPhotoView) };
       }),
+
+    getShares: protectedProcedure.input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const { getSessionById, getSessionShareIds } = await import("./db.js");
+        if (!await getSessionById(input.id, ctx.user.id)) throw new TRPCError({ code: "NOT_FOUND" });
+        return getSessionShareIds(input.id);
+      }),
+
+    setShares: protectedProcedure.input(z.object({ id: z.number().int().positive(), friendIds: z.array(z.number().int().positive()) }))
+      .mutation(async ({ ctx, input }) => {
+        const { getSessionById, setSessionShares } = await import("./db.js");
+        if (!await getSessionById(input.id, ctx.user.id)) throw new TRPCError({ code: "NOT_FOUND" });
+        return setSessionShares(input.id, ctx.user.id, input.friendIds);
+      }),
+
+    getSharedWithMe: protectedProcedure.query(async ({ ctx }) => {
+      const { getSessionsSharedWithUser } = await import("./db.js");
+      return getSessionsSharedWithUser(ctx.user.id);
+    }),
 
     // Create new session
     create: protectedProcedure
