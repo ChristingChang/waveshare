@@ -4,14 +4,17 @@ ADR 記下「要改什麼、有哪些取捨、上線前要確認什麼」。**�
 
 | 編號    | 決策                     | 編寫時的實作狀態                                                                         | 正式站 |
 | ------- | ------------------------ | ---------------------------------------------------------------------------------------- | ------ |
-| ADR-001 | 新影片改用 Cloudflare R2 | 已接受；[PR #1](https://github.com/ChristingChang/waveshare/pull/1) 已合併到主分支       | 未驗證 |
+| ADR-001 | 新影片改用 Cloudflare R2 | 已接受；[PR #1](https://github.com/ChristingChang/waveshare/pull/1) 已合併；公開播放部分已被 ADR-005 取代 | 未驗證 |
 | ADR-002 | 登入改用 GitHub          | 已被 [ADR-004](#adr-004登入從-manus-改用-google) 取代；未合併 | 不適用 |
 | ADR-003 | 資料庫改用 TiDB Cloud    | 已接受；[PR #2](https://github.com/ChristingChang/waveshare/pull/2) 已合併到主分支       | 未驗證 |
 | ADR-004 | 登入改用 Google          | 已接受；[PR #2](https://github.com/ChristingChang/waveshare/pull/2) 已合併到主分支       | 未驗證 |
+| ADR-005 | 影片只給本人播放（私人播放連結） | 已接受；[PR #10](https://github.com/ChristingChang/waveshare/pull/10) 已合併到主分支；取代 ADR-001 的公開播放部分 | 未驗證 |
 
 ## ADR-001：新影片改由瀏覽器直接傳到 Cloudflare R2
 
 **狀態：已接受。** [PR #1](https://github.com/ChristingChang/waveshare/pull/1) 已合併到主分支；正式站尚未驗證。
+
+**部分已被 [ADR-005](#adr-005影片只給本人播放) 取代：** 直接上傳到 R2、次數限制、刪除與清理仍有效。下文「R2 播放網址是公開的」以及上線前設定「播放網址」這兩處，已改為 ADR-005 的私人播放連結；以下保留原決策內容。
 
 **背景。** PR #1 之前，瀏覽器先把影片傳給 WaveShare 後端，再轉存到 Manus Forge。程式雖允許單檔 100 MiB，但網站架在 Vercel，Vercel 會先擋下大約 4.5 MB 以上的整筆請求，所以超過這個大小的影片傳不上去。見 [Vercel 部署指南](../DEPLOY_TO_VERCEL.md)。
 
@@ -60,7 +63,30 @@ ADR 記下「要改什麼、有哪些取捨、上線前要確認什麼」。**�
 - **登入網址：** WaveShare 從 `/api/auth/google` 把使用者送往 Google，Google 授權後回到 `/api/auth/google/callback`。
 - **部署設定：** 設定 `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` 與維持登入用的 `SESSION_SECRET`。`GOOGLE_CALLBACK_URL` 可選填；未填時，WaveShare 用發起登入的網站網址組成返回網址。這個返回網址必須和 Google 後台登記的完全一致。
 
+## ADR-005：影片只給本人播放
+
+**狀態：已接受。** [PR #10](https://github.com/ChristingChang/waveshare/pull/10) 已合併到主分支；正式站未驗證，Cloudflare 的公開存取也還要手動關閉。取代 [ADR-001](#adr-001新影片改由瀏覽器直接傳到-cloudflare-r2) 中「R2 播放網址公開」的部分。
+
+**背景。** 依 ADR-001，日誌只有本人能讀，但 R2 影片用公開網址播放：知道網址的人不用登入就能看（US-43）。影片的可見範圍比日誌還大，之後也沒辦法做到「只讓指定好友看」（US-51）。
+
+**決策。** 影片不再用公開網址播放。詳細頁的影片一律指向 WaveShare 自己的網址 `/api/videos/<紀錄編號>`，每次播放時由 WaveShare 決定能不能看：
+
+- 沒登入：擋下，顯示「請先登入」。
+- 登入的不是紀錄本人，或紀錄不存在：一律顯示「找不到影片」，不透露紀錄是否存在。
+- 本人：轉到一個 15 分鐘有效的 R2 播放連結。
+- 舊 Forge 影片：只有本人會被轉到原本存的網址。
+
+「誰能看」集中在同一處判斷（[播放程式](../server/videoPlayback.ts)），目前只有本人；之後做好友分享時就從這裡放寬。程式不再使用 `R2_PUBLIC_URL`，也不用改資料庫：之前上傳的 R2 影片照樣能播。其他可行方式包括維持公開網址，或讓影片內容整段經過 WaveShare 伺服器；不推定未採用的理由。
+
+**取捨。** 影片和日誌一樣只有本人看得到，但每次播放都要先經過 WaveShare 確認登入。播放連結在 15 分鐘內，拿到連結的人仍能播放；WaveShare 會要求瀏覽器不快取這個轉址，也不把網址帶給其他網站，以降低外流機會。影片播到一半連結過期時，播放器會自動重新取得一次，並從原處接著播。舊 Forge 影片從 WaveShare 只有本人能打開，但它的原網址本身是否公開，未確認。
+
+**上線前。**
+
+1. 部署後，到 Cloudflare 的 R2 bucket 設定關閉 `r2.dev` 公開網址（Public Development URL），並停用或移除所有公開的自訂網域（[R2 設定教學](R2_SETUP.zh-TW.md)第 2 步）。**沒關之前，舊的公開網址仍然誰都能播放。**
+2. 之後可以刪除 Vercel 上的 `R2_PUBLIC_URL`。
+3. 在測試站確認：本人能播放；未登入和其他帳號打不開；舊公開網址無法播放；長影片暫停超過 15 分鐘後仍能接著播。
+
 ## 切換時的依賴與待確認事項
 
 - **正式切換：** 先在目標資料庫建立所需的表，再到測試站確認 Google 登入能建立或找回帳號，以及 R2 影片能上傳和播放。
-- **資料接續：** 尚未確認正式站的既有資料、舊 Manus 帳號的對應方式，以及 Forge 影片是否須搬遷。若需要不公開的影片，應先選定私人播放方式，而不是使用目前的 R2 公開網址。
+- **資料接續：** 尚未確認正式站的既有資料、舊 Manus 帳號的對應方式，以及 Forge 影片是否須搬遷。R2 影片已改用私人播放（ADR-005）；舊 Forge 影片的原網址是否公開，仍未確認。
