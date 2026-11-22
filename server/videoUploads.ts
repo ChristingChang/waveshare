@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { photoUploads, users, videoUploads } from "../drizzle/schema.js";
-import { getDb } from "./db.js";
+import { getDb, rethrowPhotoWriteError } from "./db.js";
 
 export const DAILY_UPLOAD_LIMIT = 10;
 export const DAILY_PHOTO_UPLOAD_LIMIT = 100;
@@ -37,5 +37,5 @@ export async function reservePhotoUpload(userId: number, photoPath: string) {
       throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `照片上傳已達每 24 小時 ${DAILY_PHOTO_UPLOAD_LIMIT} 張的上限，請稍後再試。` });
     }
     await tx.insert(photoUploads).values({ userId, photoPath });
-  });
+  }).catch(rethrowPhotoWriteError);
 }
