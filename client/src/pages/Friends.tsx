@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import {
 export default function Friends() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("friends");
+  const sharedSessions = trpc.surfSessions.getSharedWithMe.useQuery();
 
   const { data: friends = [], refetch: refetchFriends } = trpc.friends.getFriends.useQuery();
   const { data: pendingRequests = [], refetch: refetchPending } = trpc.friends.getPendingRequests.useQuery();
@@ -72,6 +74,18 @@ export default function Friends() {
       </div>
 
       <div className="container max-w-2xl py-6 px-4 space-y-6">
+        <Card>
+          <CardHeader><CardTitle>好友分享給我的紀錄</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {sharedSessions.isLoading ? <p>載入中…</p> : sharedSessions.isError ? <p role="alert">無法載入分享紀錄，請稍後再試。</p> :
+              sharedSessions.data?.length ? sharedSessions.data.map(session => (
+                <Link key={session.id} href={`/detail/${session.id}`} className="block rounded-lg border p-3 hover:bg-muted">
+                  <div className="font-medium">{session.spotName}</div>
+                  <div className="text-sm text-muted-foreground">{session.date} · 由 {session.ownerName || "未命名使用者"} 分享</div>
+                </Link>
+              )) : <p className="text-muted-foreground">目前沒有好友分享的紀錄。</p>}
+          </CardContent>
+        </Card>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="friends">

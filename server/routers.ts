@@ -3,6 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { MAX_VIDEO_SIZE, deleteR2Video, presignVideo, validateVideoReference, withPlaybackUrl } from "./r2.js";
 
 export const appRouter = router({
@@ -59,8 +60,30 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const { getSessionById } = await import("./db.js");
         const session = await getSessionById(input.id, ctx.user.id);
-        return session ? withPlaybackUrl(session) : session;
+        if (session) return { ...withPlaybackUrl(session), isOwner: true, ownerName: ctx.user.name };
+        const { getSessionsSharedWithUser } = await import("./db.js");
+        const [shared] = await getSessionsSharedWithUser(ctx.user.id, input.id);
+        return shared ? { ...shared, isOwner: false } : undefined;
       }),
+
+    getShares: protectedProcedure.input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const { getSessionById, getSessionShareIds } = await import("./db.js");
+        if (!await getSessionById(input.id, ctx.user.id)) throw new TRPCError({ code: "NOT_FOUND" });
+        return getSessionShareIds(input.id);
+      }),
+
+    setShares: protectedProcedure.input(z.object({ id: z.number().int().positive(), friendIds: z.array(z.number().int().positive()) }))
+      .mutation(async ({ ctx, input }) => {
+        const { getSessionById, setSessionShares } = await import("./db.js");
+        if (!await getSessionById(input.id, ctx.user.id)) throw new TRPCError({ code: "NOT_FOUND" });
+        return setSessionShares(input.id, ctx.user.id, input.friendIds);
+      }),
+
+    getSharedWithMe: protectedProcedure.query(async ({ ctx }) => {
+      const { getSessionsSharedWithUser } = await import("./db.js");
+      return getSessionsSharedWithUser(ctx.user.id);
+    }),
 
     // Create new session
     create: protectedProcedure
