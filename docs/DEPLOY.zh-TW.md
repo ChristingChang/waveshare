@@ -1,6 +1,6 @@
 # WaveShare 部署教學：Google 登入、TiDB Cloud、Vercel
 
-本版本不需要 Manus 帳號或 Forge 服務。網站放在 Vercel，帳號與衝浪紀錄放在 TiDB Cloud，影片放在 Cloudflare R2。
+本版本不需要 Manus 帳號或 Forge 服務。網站放在 Vercel，帳號與衝浪紀錄放在 TiDB Cloud，影片與照片放在 Cloudflare R2。
 
 **舊 Manus 帳號不會自動轉移。** 使用者需要重新用 Google 登入，建立新的 WaveShare 帳號，從空白紀錄開始；不會依相同電子郵件合併舊資料。舊資料不會因此被刪除。
 
@@ -82,26 +82,21 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 
 ## 6. 初始化 / 更新資料庫
 
-請協助部署的人在專案根目錄執行，電腦需要 Node.js 22.13 以上與 pnpm：
+**Vercel 部署不會自動更新資料庫。** 請在重新部署前，由管理者在 TiDB Cloud 的 **SQL Editor** 手動執行還沒套用的 SQL。若要更新現有資料庫，請先備份。確認選的是網站 `DATABASE_URL` 指向的資料庫（本教學使用 `waveshare`）。
 
-```sh
-pnpm install --frozen-lockfile
-```
-
-複製 `.env.example` 為本機 `.env`，填入 `DATABASE_URL`，需要時填 `DATABASE_SSL`；不要提交 `.env`。確認目標為剛建立的 TiDB 資料庫，不是其他網站的資料庫，再執行已隨專案提供的遷移：
-
-```sh
-pnpm exec drizzle-kit migrate
-```
-
-也可使用專案既有 `pnpm db:push`（會先產生 schema 差異，再遷移）。若是在既有資料庫上升級，先備份，再請熟悉資料庫的人確認。遷移需要包含 `video_uploads` 表，上傳次數限制與清理會用到。
+1. **全新資料庫才需要這一步：** 先照編號依序開啟 [`0000` 到 `0003` 的 SQL 檔](../drizzle/)，貼到 SQL Editor 逐檔執行。若檔案中有 `--> statement-breakpoint`，貼上後先刪除那一整行（只移除分隔標記，不移除 SQL）。原有站點不用重跑已套用的檔案；影片上傳次數限制和清理需要 `0003` 建立的 `video_uploads` 表。
+2. **好友分享（0004）：** 開啟 [`drizzle/0004_session_shares.sql`](../drizzle/0004_session_shares.sql)，把內容貼到 SQL Editor，刪除 `--> statement-breakpoint` 那一行後執行，建立 `session_shares` 表及其索引。若已套用 0004，不要重跑。
+3. **照片（0005）：** 開啟 [`drizzle/manual/0005_photos.sql`](../drizzle/manual/0005_photos.sql)，整份貼到 SQL Editor 執行，建立 `photo_uploads` 和 `session_photos`。這份檔案可重複執行；不要另外執行 `drizzle/0005_photos.sql`，它是給 Drizzle 工具使用的同一項更新。
+4. 確認上述三張新表都出現在正確的資料庫，再回 Vercel 重新部署。如果 0004 曾執行到一半或不確定某次更新是否已完成，先請熟悉資料庫的人核對，不要直接重跑。手動貼 SQL 不會更新 Drizzle 的遷移紀錄；同一資料庫不要再用 `pnpm db:push` 或 `pnpm exec drizzle-kit migrate` 重跑已手動套用的檔案。
 
 ## 7. 重新部署與確認
 
 1. 回到 Vercel **Deployments** → 目前版本 → **Redeploy**。
 2. 用未登入的視窗開啟網站，應自動前往 Google 登入與授權，完成後回到首頁；再測試登出與重新登入。
-3. 新增衝浪紀錄並上傳影片，測試播放、編輯與刪除。影片直接上傳 R2，不受 Vercel 約 4.5 MB 的函式請求大小限制。
-   確認影片只有本人能播放：未登入或用另一個帳號打開 `/api/videos/<紀錄編號>` 會被擋下，舊的 `r2.dev` 公開網址也無法播放。
-4. 每位使用者每滾動 24 小時最多申請 10 次上傳，未完成的申請也會計入。設定 `CRON_SECRET` 後，Vercel 每天呼叫清理路由，細節見 R2 教學。
+3. 在測試站新增一筆有影片的紀錄，以及一筆有照片、無影片的紀錄。確認本人能播放影片、點照片縮圖看大圖、編輯照片與刪除紀錄。選用的影片及照片直接上傳 R2，不受 Vercel 約 4.5 MB 的函式請求大小限制。
+4. 用不同帳號確認新紀錄預設不分享。指定好友並儲存後，對方可從好友頁打開紀錄及其影片或照片，但不能編輯。未登入或未被選中的好友直接開啟 `/api/videos/<紀錄編號>` 或 `/api/photos/<照片編號>` 會被擋下；取消分享後，指定好友也無法再向 WaveShare 取得新連結。先前取得的 R2 連結仍可能用到 15 分鐘的有效期結束。另確認舊的 `r2.dev` 或公開自訂網域網址已無法播放。
+5. 每位使用者在任意連續 24 小時內最多申請 10 次影片和 100 次照片上傳，未完成的申請也會計入。設定 `CRON_SECRET` 後，Vercel 每天清理未使用的上傳，細節見 [R2 教學](R2_SETUP.zh-TW.md)。
+
+好友分享（[#13](https://github.com/ChristingChang/waveshare/pull/13)）和照片（[#14](https://github.com/ChristingChang/waveshare/pull/14)）都未在實際的 Cloudflare R2 或正式資料庫上測試。請先完成上述測試站檢查，再正式上線。
 
 若登入失敗，先確認 Google redirect URI 完全一致、應用程式已發布為 In production、Secret 無多餘空白、TiDB 遷移已完成，並且已重新部署。不要將登入 code、存取 token、Cookie 或資料庫密碼貼到公開 issue。
