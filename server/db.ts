@@ -319,12 +319,24 @@ export async function getSessionPhoto(photoId: number) {
   return result[0];
 }
 
-export async function addSessionPhotos(sessionId: number, userId: number, photoPaths: string[]) {
-  if (!photoPaths.length) return;
+// Removes and adds a session's photos in one transaction; returns the removed rows.
+export async function changeSessionPhotos(sessionId: number, userId: number, removeIds: number[], addPaths: string[]) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const { sessionPhotos } = await import("../drizzle/schema.js");
-  await db.insert(sessionPhotos).values(photoPaths.map(photoPath => ({ sessionId, userId, photoPath })));
+  const { and, inArray } = await import("drizzle-orm");
+  return db.transaction(async tx => {
+    let removed: (typeof sessionPhotos.$inferSelect)[] = [];
+    if (removeIds.length) {
+      const condition = and(eq(sessionPhotos.sessionId, sessionId), eq(sessionPhotos.userId, userId), inArray(sessionPhotos.id, removeIds));
+      removed = await tx.select().from(sessionPhotos).where(condition);
+      if (removed.length) await tx.delete(sessionPhotos).where(condition);
+    }
+    if (addPaths.length) {
+      await tx.insert(sessionPhotos).values(addPaths.map(photoPath => ({ sessionId, userId, photoPath })));
+    }
+    return removed;
+  });
 }
 
 // Removes the given photos (or all of the session's photos) and returns the removed rows.

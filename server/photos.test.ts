@@ -8,7 +8,7 @@ import { sdk } from "./_core/sdk.js";
 import type { TrpcContext } from "./_core/context.js";
 import { appRouter } from "./routers.js";
 import {
-  addSessionPhotos, createSurfSession, deleteSurfSession, getSessionById, getSessionPhoto, getSessionPhotos,
+  changeSessionPhotos, createSurfSession, deleteSurfSession, getSessionById, getSessionPhoto, getSessionPhotos,
   canFriendViewSession, getSessionsSharedWithUser, getUserByOpenId, isPhotoPathReferenced, removeSessionPhotos, updateSurfSession,
 } from "./db.js";
 import { isR2PhotoPath } from "./photos.js";
@@ -21,7 +21,7 @@ vi.mock("./_core/env.js", () => ({ ENV: {
 } }));
 vi.mock("./db.js", () => ({
   getDb: vi.fn(), getUserByOpenId: vi.fn(), getSessionPhoto: vi.fn(), getSessionPhotos: vi.fn(), getSessionById: vi.fn(),
-  createSurfSession: vi.fn(), updateSurfSession: vi.fn(), deleteSurfSession: vi.fn(), addSessionPhotos: vi.fn(),
+  createSurfSession: vi.fn(), updateSurfSession: vi.fn(), deleteSurfSession: vi.fn(), changeSessionPhotos: vi.fn(async () => []),
   removeSessionPhotos: vi.fn(), isPhotoPathReferenced: vi.fn(), isVideoPathReferenced: vi.fn(),
   canFriendViewSession: vi.fn(), getSessionsSharedWithUser: vi.fn(),
 }));
@@ -149,10 +149,9 @@ describe("record photos", () => {
   it("adds and removes photos on edit and deletes removed files from R2", async () => {
     const send = vi.spyOn(S3Client.prototype, "send").mockResolvedValue({} as never);
     vi.mocked(getSessionPhotos).mockResolvedValueOnce([{ id: 3, sessionId: 7, userId: 42, photoPath: photo(1), createdAt: new Date() }]);
-    vi.mocked(removeSessionPhotos).mockResolvedValueOnce([{ id: 3, sessionId: 7, userId: 42, photoPath: photo(1), createdAt: new Date() }]);
+    vi.mocked(changeSessionPhotos).mockResolvedValueOnce([{ id: 3, sessionId: 7, userId: 42, photoPath: photo(1), createdAt: new Date() }]);
     await caller.surfSessions.update({ id: 7, addPhotoPaths: [photo(2)], removePhotoIds: [3] });
-    expect(removeSessionPhotos).toHaveBeenCalledWith(7, 42, [3]);
-    expect(addSessionPhotos).toHaveBeenCalledWith(7, 42, [photo(2)]);
+    expect(changeSessionPhotos).toHaveBeenCalledWith(7, 42, [3], [photo(2)]);
     expect(updateSurfSession).not.toHaveBeenCalled();
     const command = send.mock.calls[0][0] as DeleteObjectCommand;
     expect(command).toBeInstanceOf(DeleteObjectCommand);
@@ -160,17 +159,23 @@ describe("record photos", () => {
     send.mockRestore();
   });
 
+  it("keeps existing photos when saving the record fails", async () => {
+    vi.mocked(updateSurfSession).mockRejectedValueOnce(new Error("database failed"));
+    await expect(caller.surfSessions.update({ id: 7, note: "x", removePhotoIds: [3] })).rejects.toThrow("database failed");
+    expect(changeSessionPhotos).not.toHaveBeenCalled();
+  });
+
   it("keeps the 10-photo limit across existing and new photos", async () => {
     vi.mocked(getSessionPhotos).mockResolvedValueOnce(Array.from({ length: 10 }, (_, i) => (
       { id: i + 1, sessionId: 7, userId: 42, photoPath: photo(i), createdAt: new Date() })));
     await expect(caller.surfSessions.update({ id: 7, addPhotoPaths: [photo(20)] })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    expect(addSessionPhotos).not.toHaveBeenCalled();
+    expect(changeSessionPhotos).not.toHaveBeenCalled();
   });
 
   it("refuses photo changes on another account's record", async () => {
     vi.mocked(getSessionById).mockResolvedValueOnce(undefined);
     await expect(caller.surfSessions.update({ id: 7, addPhotoPaths: [photo(2)] })).rejects.toMatchObject({ code: "NOT_FOUND" });
-    expect(addSessionPhotos).not.toHaveBeenCalled();
+    expect(changeSessionPhotos).not.toHaveBeenCalled();
   });
 
   it("removes a deleted record's photos from the database and R2", async () => {
