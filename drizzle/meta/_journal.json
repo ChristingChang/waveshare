@@ -43,6 +43,13 @@
       "when": 1795330970403,
       "tag": "0005_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1795333135563,
+      "tag": "0006_surf_conditions",
+      "breakpoints": true
     }
   ]
 }

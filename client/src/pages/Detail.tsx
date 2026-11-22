@@ -1,3 +1,4 @@
+import { SessionConditions } from "@/components/SessionConditions";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -131,6 +132,7 @@ export default function Detail() {
             </div>}
           </div>
           <h1 className="text-3xl font-bold mb-2">{session.spotName}</h1>
+          <SessionConditions conditions={session.conditions} />
           {!session.isOwner && <p className="mb-2">由 {session.ownerName || "未命名使用者"} 分享</p>}
           <div className="flex items-center gap-2 text-primary-foreground/90">
             <Calendar className="w-4 h-4" />
