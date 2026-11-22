@@ -16,6 +16,7 @@ import { ArrowLeft, Edit, Trash2, Star, Calendar, Waves } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { SessionVideo } from "@/components/SessionVideo";
+import { SessionPhotos } from "@/components/SessionPhotos";
 import { SessionShares } from "@/components/SessionShares";
 
 export default function Detail() {
@@ -156,14 +157,24 @@ export default function Detail() {
           />
         )}
         {/* Video Player */}
-        <Card className="overflow-hidden bg-card">
-          <SessionVideo
-            src={session.videoUrl}
-            controls
-            className="w-full bg-black"
-            style={{ maxHeight: "500px" }}
-          />
-        </Card>
+        {session.videoUrl && (
+          <Card className="overflow-hidden bg-card">
+            <SessionVideo
+              src={session.videoUrl}
+              controls
+              className="w-full bg-black"
+              style={{ maxHeight: "500px" }}
+            />
+          </Card>
+        )}
+
+        {session.photos.length > 0 && (
+          <Card className="bg-card">
+            <CardContent className="pt-6">
+              <SessionPhotos photos={session.photos} />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Details */}
         <Card className="bg-card">

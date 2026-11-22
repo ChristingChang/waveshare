@@ -162,6 +162,6 @@ describe("surfSessions", () => {
     const result = await caller.surfSessions.create(newSession);
 
     expect(result).toBeDefined();
-    expect(createSurfSession).toHaveBeenCalledWith({ userId: 1, ...newSession, videoUrl: "" });
+    expect(createSurfSession).toHaveBeenCalledWith({ userId: 1, ...newSession, videoUrl: "" }, []);
   });
 });
