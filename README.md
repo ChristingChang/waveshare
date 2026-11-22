@@ -84,7 +84,7 @@ cp .env.example .env
 - `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` - Google OAuth App 登入設定
 - `GOOGLE_CALLBACK_URL` - 選用；預設為目前網站的 `/api/auth/google/callback`
 - `DATABASE_SSL=true` - 非 TiDB 的資料庫若需要 TLS 可設定；TiDB Cloud 會自動啟用驗證憑證的 TLS
-- `R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_URL` - 影片儲存；請依 [R2 設定教學](docs/R2_SETUP.zh-TW.md) 操作。R2 變數僅限伺服器，不要加 `VITE_` 前綴。
+- `R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET` - 影片儲存；請依 [R2 設定教學](docs/R2_SETUP.zh-TW.md) 操作。R2 變數僅限伺服器，不要加 `VITE_` 前綴。
 
 4. **初始化資料庫**
 ```bash
@@ -109,7 +109,7 @@ pnpm test
 
 使用專案根目錄的 `vercel.json`：`pnpm build` 產生 `dist/public`，Vercel 託管靜態前端，非檔案的 SPA 路徑回傳 `index.html`。`/api/*` 由 `api/index.ts` 匯出的 Express app 處理，共用 `server/_core/app.ts` 的 OAuth、上傳與 tRPC 路由；不會啟動本機監聽器。`pnpm dev` / `pnpm start` 的本機 Node server 行為不變。
 
-**影片直接上傳：** 登入後先由 tRPC 取得 10 分鐘有效的 R2 預簽 PUT 網址，再由瀏覽器直接上傳 MP4、MOV 或 WebM（最多 100 MiB）。影片不經 Vercel function，因此不受其約 4.5 MB body 限制；舊 `/api/upload-video` 路由已移除。公開播放網址的影片可被知道網址的人觀看。詳見 [R2 設定教學](docs/R2_SETUP.zh-TW.md) 與 [部署指南](DEPLOY_TO_VERCEL.md)。
+**影片直接上傳：** 登入後先由 tRPC 取得 10 分鐘有效的 R2 預簽 PUT 網址，再由瀏覽器直接上傳 MP4、MOV 或 WebM（最多 100 MiB）。影片不經 Vercel function，因此不受其約 4.5 MB body 限制；舊 `/api/upload-video` 路由已移除。播放時影片頁使用 `/api/videos/<紀錄編號>`：伺服器確認登入者是紀錄擁有者後，才轉址到 15 分鐘有效的 R2 預簽 GET 網址；未登入回 401，其他帳號回 404。R2 bucket 應關閉公開存取（r2.dev 與自訂網域），舊的公開網址才會失效。詳見 [R2 設定教學](docs/R2_SETUP.zh-TW.md) 與 [部署指南](DEPLOY_TO_VERCEL.md)。
 
 ## 專案結構
 
