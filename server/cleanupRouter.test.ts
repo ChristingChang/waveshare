@@ -2,9 +2,9 @@ import type { Server } from "http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "./_core/app.js";
 import { ENV } from "./_core/env.js";
-import { cleanupUnusedVideos } from "./videoCleanup.js";
+import { cleanupUnusedPhotos, cleanupUnusedVideos } from "./videoCleanup.js";
 
-vi.mock("./videoCleanup.js", () => ({ cleanupUnusedVideos: vi.fn() }));
+vi.mock("./videoCleanup.js", () => ({ cleanupUnusedVideos: vi.fn(), cleanupUnusedPhotos: vi.fn() }));
 
 let server: Server;
 let origin: string;
@@ -20,6 +20,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   ENV.cronSecret = "test-cron-secret";
   vi.mocked(cleanupUnusedVideos).mockResolvedValue({ scanned: 1, deleted: 1, failed: 0 });
+  vi.mocked(cleanupUnusedPhotos).mockResolvedValue({ scanned: 2, deleted: 1, failed: 1 });
 });
 afterAll(async () => {
   ENV.cronSecret = originalSecret;
@@ -46,8 +47,9 @@ describe("authenticated video cleanup cron", () => {
   it("runs cleanup for a Vercel bearer-authenticated GET", async () => {
     const response = await fetch(`${origin}/api/cron/cleanup-videos`, { headers: { authorization: "Bearer test-cron-secret" } });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ scanned: 1, deleted: 1, failed: 0 });
+    expect(await response.json()).toEqual({ scanned: 1, deleted: 1, failed: 0, photos: { scanned: 2, deleted: 1, failed: 1 } });
     expect(cleanupUnusedVideos).toHaveBeenCalledOnce();
+    expect(cleanupUnusedPhotos).toHaveBeenCalledOnce();
   });
 
   it("returns a generic error if cleanup cannot run", async () => {

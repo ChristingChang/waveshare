@@ -18,6 +18,8 @@ import {
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { SessionVideo } from "@/components/SessionVideo";
+import { PhotoPicker } from "@/components/PhotoPicker";
+import { uploadPhotos } from "@/lib/photoUpload";
 
 export default function Edit() {
   const [, params] = useRoute("/edit/:id");
@@ -35,6 +37,9 @@ export default function Edit() {
   const [boardType, setBoardType] = useState("");
   const [waveQuality, setWaveQuality] = useState(3);
   const [note, setNote] = useState("");
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [removedPhotoIds, setRemovedPhotoIds] = useState<number[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
   useEffect(() => {
     if (session) {
@@ -47,6 +52,7 @@ export default function Edit() {
   }, [session]);
 
   const utils = trpc.useUtils();
+  const presignPhotoUpload = trpc.surfSessions.presignPhotoUpload.useMutation();
   const updateSession = trpc.surfSessions.update.useMutation({
     onSuccess: () => {
       utils.surfSessions.invalidate();
@@ -58,12 +64,23 @@ export default function Edit() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!spotName.trim()) {
       toast.error("請輸入浪點名稱");
       return;
+    }
+
+    let addPhotoPaths: string[];
+    setUploadingPhotos(true);
+    try {
+      addPhotoPaths = await uploadPhotos(photoFiles, presignPhotoUpload.mutateAsync);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "照片上傳失敗，請稍後重試");
+      return;
+    } finally {
+      setUploadingPhotos(false);
     }
 
     updateSession.mutate({
@@ -73,8 +90,12 @@ export default function Edit() {
       boardType: boardType.trim() || undefined,
       note: note.trim() || undefined,
       waveQuality,
+      addPhotoPaths,
+      removePhotoIds: removedPhotoIds,
     });
   };
+
+  const saving = uploadingPhotos || updateSession.isPending;
 
   if (isLoading) {
     return (
@@ -114,16 +135,27 @@ export default function Edit() {
           <Card className="bg-card">
             <CardContent className="pt-6 space-y-6">
               {/* Video Preview (Read-only) */}
-              <div className="space-y-2">
-                <Label className="text-card-foreground">影片</Label>
-                <SessionVideo
-                  src={session.videoUrl}
-                  controls
-                  className="w-full rounded-lg bg-black"
-                  style={{ maxHeight: "300px" }}
-                />
-                <p className="text-sm text-muted-foreground">影片無法更改</p>
-              </div>
+              {session.videoUrl && (
+                <div className="space-y-2">
+                  <Label className="text-card-foreground">影片</Label>
+                  <SessionVideo
+                    src={session.videoUrl}
+                    controls
+                    className="w-full rounded-lg bg-black"
+                    style={{ maxHeight: "300px" }}
+                  />
+                  <p className="text-sm text-muted-foreground">影片無法更改</p>
+                </div>
+              )}
+
+              <PhotoPicker
+                files={photoFiles}
+                onFilesChange={setPhotoFiles}
+                existing={session.photos}
+                removedIds={removedPhotoIds}
+                onRemovedIdsChange={setRemovedPhotoIds}
+                disabled={saving}
+              />
 
               {/* Date */}
               <div className="space-y-2">
@@ -213,16 +245,16 @@ export default function Edit() {
               variant="outline"
               className="flex-1"
               onClick={() => setLocation(`/detail/${sessionId}`)}
-              disabled={updateSession.isPending}
+              disabled={saving}
             >
               取消
             </Button>
             <Button
               type="submit"
               className="flex-1"
-              disabled={updateSession.isPending}
+              disabled={saving}
             >
-              {updateSession.isPending ? (
+              {saving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   儲存中...

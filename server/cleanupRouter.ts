@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { ENV } from "./_core/env.js";
-import { cleanupUnusedVideos } from "./videoCleanup.js";
+import { cleanupUnusedPhotos, cleanupUnusedVideos } from "./videoCleanup.js";
 
 export const cleanupRouter = Router();
 
@@ -14,7 +14,8 @@ cleanupRouter.get("/cleanup-videos", async (req, res) => {
     return;
   }
   try {
-    res.json(await cleanupUnusedVideos());
+    const videos = await cleanupUnusedVideos();
+    res.json({ ...videos, photos: await cleanupUnusedPhotos() });
   } catch (error) {
     console.error("[R2] Video cleanup failed:", error);
     res.status(500).json({ error: "Video cleanup failed" });
