@@ -16,6 +16,7 @@ import { ArrowLeft, Edit, Trash2, Star, Calendar, Waves } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { SessionVideo } from "@/components/SessionVideo";
+import { SessionShares } from "@/components/SessionShares";
 
 export default function Detail() {
   const [, params] = useRoute("/detail/:id");
@@ -30,10 +31,19 @@ export default function Detail() {
   );
   const companions = trpc.surfSessions.getCompanions.useQuery(
     { id: sessionId },
-    { enabled: !!session }
+    { enabled: !!session?.isOwner }
   );
 
   const utils = trpc.useUtils();
+  const friends = trpc.friends.getFriends.useQuery(undefined, { enabled: !!session?.isOwner });
+  const shares = trpc.surfSessions.getShares.useQuery({ id: sessionId }, { enabled: !!session?.isOwner });
+  const saveShares = trpc.surfSessions.setShares.useMutation({
+    onSuccess: () => {
+      utils.surfSessions.invalidate();
+      toast.success("分享設定已儲存");
+    },
+    onError: () => toast.error("儲存分享設定失敗，請再試一次"),
+  });
   const deleteSession = trpc.surfSessions.delete.useMutation({
     onSuccess: () => {
       utils.surfSessions.invalidate();
@@ -102,7 +112,7 @@ export default function Detail() {
             >
               <ArrowLeft className="w-6 h-6" />
             </Button>
-            <div className="flex gap-2">
+            {session.isOwner && <div className="flex gap-2">
               <Button
                 variant="ghost"
                 size="icon"
@@ -120,9 +130,10 @@ export default function Detail() {
               >
                 <Trash2 className="w-5 h-5" />
               </Button>
-            </div>
+            </div>}
           </div>
           <h1 className="text-3xl font-bold mb-2">{session.spotName}</h1>
+          {!session.isOwner && <p className="mb-2">由 {session.ownerName || "未命名使用者"} 分享</p>}
           <div className="flex items-center gap-2 text-primary-foreground/90">
             <Calendar className="w-4 h-4" />
             <span>{formatDate(session.date)}</span>
@@ -131,6 +142,19 @@ export default function Detail() {
       </div>
 
       <div className="container max-w-2xl py-6 px-4 space-y-6">
+        {session.isOwner && (
+          friends.isError || shares.isError ? <p role="alert">無法載入分享設定，請重新整理後再試。</p> :
+          friends.data && shares.data && <SessionShares
+            key={sessionId}
+            friends={friends.data.map(friend => ({
+              id: friend.userId === session.userId ? friend.friendId : friend.userId,
+              name: friend.friendName,
+            }))}
+            sharedIds={shares.data}
+            pending={saveShares.isPending}
+            onSave={friendIds => saveShares.mutate({ id: sessionId, friendIds })}
+          />
+        )}
         {/* Video Player */}
         <Card className="overflow-hidden bg-card">
           <SessionVideo
@@ -161,22 +185,24 @@ export default function Detail() {
               </div>
             )}
 
-            <div>
-              <h2 className="text-sm text-muted-foreground mb-2">衝浪夥伴</h2>
-              {companions.data?.length ? (
-                <ul className="flex flex-wrap gap-2">
-                  {companions.data.map(companion => (
-                    <li key={companion.companionId} className="max-w-full break-all rounded-lg bg-muted px-3 py-2 text-sm">
-                      {companion.name || companion.email || "未命名好友"}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {companions.isPending ? "正在載入…" : companions.isError ? "無法載入衝浪夥伴。" : "沒有標記衝浪夥伴。"}
-                </p>
-              )}
-            </div>
+            {session.isOwner && (
+              <div>
+                <h2 className="text-sm text-muted-foreground mb-2">衝浪夥伴</h2>
+                {companions.data?.length ? (
+                  <ul className="flex flex-wrap gap-2">
+                    {companions.data.map(companion => (
+                      <li key={companion.companionId} className="max-w-full break-all rounded-lg bg-muted px-3 py-2 text-sm">
+                        {companion.name || companion.email || "未命名好友"}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {companions.isPending ? "正在載入…" : companions.isError ? "無法載入衝浪夥伴。" : "沒有標記衝浪夥伴。"}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Note */}
             {session.note && (
@@ -192,7 +218,7 @@ export default function Detail() {
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      {session.isOwner && <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="bg-card text-card-foreground">
           <AlertDialogHeader>
             <AlertDialogTitle>確認刪除</AlertDialogTitle>
@@ -210,7 +236,7 @@ export default function Detail() {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+      </AlertDialog>}
     </div>
   );
 }

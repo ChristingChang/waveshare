@@ -32,7 +32,7 @@ export default function Edit() {
   );
   const companions = trpc.surfSessions.getCompanions.useQuery(
     { id: sessionId },
-    { enabled: !!session }
+    { enabled: !!session?.isOwner }
   );
 
   const [date, setDate] = useState("");
@@ -92,7 +92,7 @@ export default function Edit() {
     );
   }
 
-  if (!session) {
+  if (!session?.isOwner) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
         <p className="text-muted-foreground mb-4">找不到此紀錄</p>

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { COOKIE_NAME } from "../shared/const.js";
 import { createApp } from "./_core/app.js";
 import { sdk } from "./_core/sdk.js";
-import { getSessionVideo, getUserByOpenId } from "./db.js";
+import { canFriendViewSession, getSessionVideo, getUserByOpenId } from "./db.js";
 import { canViewSessionVideo } from "./videoPlayback.js";
 
 vi.mock("./_core/env.js", () => ({ ENV: {
@@ -12,7 +12,7 @@ vi.mock("./_core/env.js", () => ({ ENV: {
 } }));
 vi.mock("./db.js", async importOriginal => ({
   ...await importOriginal<typeof import("./db.js")>(),
-  getSessionVideo: vi.fn(), getUserByOpenId: vi.fn(),
+  getSessionVideo: vi.fn(), getUserByOpenId: vi.fn(), canFriendViewSession: vi.fn(),
 }));
 
 const videoPath = "r2/surf-videos/42/video-123-0123456789abcdef.mp4";
@@ -35,6 +35,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getUserByOpenId).mockImplementation(async openId => users[openId] as never);
   vi.mocked(getSessionVideo).mockResolvedValue(ownedSession);
+  vi.mocked(canFriendViewSession).mockResolvedValue(false);
 });
 afterAll(async () => {
   await new Promise<void>((resolve, reject) => {
@@ -50,9 +51,31 @@ async function play(path: string, openId?: string) {
 }
 
 describe("private video playback", () => {
-  it("lets only the record's owner view by default", () => {
-    expect(canViewSessionVideo({ id: 42 }, { userId: 42 })).toBe(true);
-    expect(canViewSessionVideo({ id: 43 }, { userId: 42 })).toBe(false);
+  it("lets only the record's owner view by default", async () => {
+    expect(await canViewSessionVideo({ id: 42 }, ownedSession)).toBe(true);
+    expect(canFriendViewSession).not.toHaveBeenCalled();
+    expect(await canViewSessionVideo({ id: 43 }, ownedSession)).toBe(false);
+  });
+
+  it("redirects a shared friend, then immediately hides playback after unsharing", async () => {
+    vi.mocked(canFriendViewSession).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    expect((await play("/api/videos/7", "google:other")).status).toBe(302);
+    const unshared = await play("/api/videos/7", "google:other");
+    expect(unshared.status).toBe(404);
+    expect(unshared.headers.get("location")).toBeNull();
+    expect(canFriendViewSession).toHaveBeenCalledWith(7, 43);
+  });
+
+  it.each(["non-friend", "stale friendship"])("hides playback for a %s", async () => {
+    vi.mocked(canFriendViewSession).mockResolvedValue(false);
+    expect((await play("/api/videos/7", "google:other")).status).toBe(404);
+  });
+
+  it("fails closed if the sharing lookup fails", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(canFriendViewSession).mockRejectedValueOnce(new Error("query failed"));
+    expect((await play("/api/videos/7", "google:other")).status).toBe(500);
+    log.mockRestore();
   });
 
   it("redirects the owner to a short-lived signed R2 link for an existing video", async () => {

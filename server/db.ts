@@ -1,9 +1,11 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, exists, or } from "drizzle-orm";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2/promise";
 import { InsertUser, users } from "../drizzle/schema.js";
 import { databaseConfig } from "./_core/databaseConfig.js";
+import { friendships, sessionShares, surfSessions } from "../drizzle/schema.js";
+import { withPlaybackUrl } from "./r2.js";
 
 type Database = MySql2Database<Record<string, unknown>>;
 
@@ -179,6 +181,65 @@ export async function getSessionById(sessionId: number, userId: number) {
     .limit(1);
   
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getSessionShareIds(sessionId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db.select({ friendId: sessionShares.friendId }).from(sessionShares)
+    .where(eq(sessionShares.sessionId, sessionId));
+  return rows.map(row => row.friendId);
+}
+
+export async function setSessionShares(sessionId: number, ownerId: number, friendIds: number[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.transaction(async tx => {
+    const [session] = await tx.select().from(surfSessions)
+      .where(and(eq(surfSessions.id, sessionId), eq(surfSessions.userId, ownerId))).for("update");
+    if (!session) throw new Error("Session not found");
+    const friends = await tx.select().from(friendships).where(and(
+      eq(friendships.status, "accepted"),
+      or(eq(friendships.userId, ownerId), eq(friendships.friendId, ownerId)),
+    ));
+    const accepted = new Set(friends.map(friend => friend.userId === ownerId ? friend.friendId : friend.userId));
+    const ids = Array.from(new Set(friendIds)).filter(id => id !== ownerId && accepted.has(id));
+    await tx.delete(sessionShares).where(eq(sessionShares.sessionId, sessionId));
+    if (ids.length) await tx.insert(sessionShares).values(ids.map(friendId => ({ sessionId, friendId })));
+    return ids;
+  });
+}
+
+function acceptedFriendship(viewerId: number) {
+  return and(eq(friendships.status, "accepted"), or(
+    and(eq(friendships.userId, surfSessions.userId), eq(friendships.friendId, viewerId)),
+    and(eq(friendships.friendId, surfSessions.userId), eq(friendships.userId, viewerId)),
+  ));
+}
+
+export async function getSessionsSharedWithUser(viewerId: number, sessionId?: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db.select({ session: surfSessions, ownerName: users.name }).from(sessionShares)
+    .innerJoin(surfSessions, eq(surfSessions.id, sessionShares.sessionId))
+    .innerJoin(users, eq(users.id, surfSessions.userId))
+    .where(and(eq(sessionShares.friendId, viewerId),
+      sessionId === undefined ? undefined : eq(surfSessions.id, sessionId),
+      exists(db.select({ id: friendships.id }).from(friendships).where(acceptedFriendship(viewerId))),
+    ))
+    .orderBy(desc(surfSessions.date), desc(surfSessions.createdAt), desc(surfSessions.id));
+  return rows.map(({ session, ownerName }) => ({ ...withPlaybackUrl(session), ownerName }));
+}
+
+export async function canFriendViewSession(sessionId: number, viewerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db.select({ id: sessionShares.id }).from(sessionShares)
+    .innerJoin(surfSessions, eq(surfSessions.id, sessionShares.sessionId))
+    .where(and(eq(sessionShares.sessionId, sessionId), eq(sessionShares.friendId, viewerId),
+      exists(db.select({ id: friendships.id }).from(friendships).where(acceptedFriendship(viewerId))),
+    )).limit(1);
+  return rows.length > 0;
 }
 
 export async function getSessionVideo(sessionId: number) {
@@ -527,13 +588,15 @@ export async function getSessionCompanions(sessionId: number, userId: number) {
 export async function deleteSurfSession(sessionId: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
-  const { surfSessions } = await import("../drizzle/schema.js");
+
+  const ownedSession = and(eq(surfSessions.id, sessionId), eq(surfSessions.userId, userId));
   return db.transaction(async tx => {
-    const result = await tx.delete(surfSessions)
-      .where(and(eq(surfSessions.id, sessionId), eq(surfSessions.userId, userId)));
-    if (result[0].affectedRows) await removeSessionCompanions(tx, sessionId);
-    return result;
+    const [session] = await tx.select({ id: surfSessions.id }).from(surfSessions)
+      .where(ownedSession).for("update");
+    if (!session) return;
+    await tx.delete(sessionShares).where(eq(sessionShares.sessionId, sessionId));
+    await removeSessionCompanions(tx, sessionId);
+    return tx.delete(surfSessions).where(ownedSession);
   });
 }
 
