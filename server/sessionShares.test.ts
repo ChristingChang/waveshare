@@ -6,12 +6,18 @@ import { drizzle } from "drizzle-orm/mysql2";
 vi.mock("drizzle-orm/mysql2", () => ({ drizzle: vi.fn() }));
 vi.mock("mysql2/promise", () => ({ createPool: vi.fn(() => ({})) }));
 
-let results: unknown[][];
+let results: (unknown[] | Error)[];
 let predicates: unknown[];
 const values = vi.fn().mockResolvedValue(undefined);
-const remove = vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) }));
+const removeWhere = vi.fn().mockResolvedValue(undefined);
+const remove = vi.fn(() => ({ where: removeWhere }));
 const insert = vi.fn(() => ({ values }));
 const buildSelect = () => {
+  const queryResult = async () => {
+    const result = results.shift() ?? [];
+    if (result instanceof Error) throw result;
+    return result;
+  };
   const chain: any = {
     from: () => chain,
     innerJoin: () => chain,
@@ -19,7 +25,8 @@ const buildSelect = () => {
     for: () => chain,
     limit: () => chain,
     orderBy: () => chain,
-    then: (resolve: (value: unknown) => void) => Promise.resolve(results.shift() ?? []).then(resolve),
+    then: (resolve: (value: unknown) => void, reject: (error: unknown) => void) => queryResult().then(resolve, reject),
+    catch: (reject: (error: unknown) => void) => queryResult().catch(reject),
     getSQL: () => { throw new Error("Subquery should be compiled by Drizzle in SQL-specific test"); },
   };
   return chain;
@@ -30,6 +37,7 @@ const database = { select, delete: remove, insert, transaction: async (fn: (tx: 
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  removeWhere.mockReset().mockResolvedValue(undefined);
   results = [];
   predicates = [];
   vi.stubEnv("DATABASE_URL", "mysql://test:test@localhost/test");
@@ -38,6 +46,60 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("session share persistence", () => {
+  const missingTableErrors = [
+    Object.assign(new Error("Table does not exist"), { code: "ER_NO_SUCH_TABLE" }),
+    Object.assign(new Error("Table does not exist"), { errno: 1146 }),
+    Object.assign(new Error("Failed query"), { cause: { code: "ER_NO_SUCH_TABLE" } }),
+    Object.assign(new Error("Failed query"), { cause: { cause: { errno: 1146 } } }),
+  ];
+
+  it.each(missingTableErrors)("treats missing-table errors as no sharing: %s", async error => {
+    const { getSessionShareIds, getSessionsSharedWithUser, canFriendViewSession } = await import("./db.js");
+    results = [error, error, error];
+    expect(await getSessionShareIds(7)).toEqual([]);
+    expect(await getSessionsSharedWithUser(2)).toEqual([]);
+    expect(await canFriendViewSession(7, 2)).toBe(false);
+  });
+
+  it.each(missingTableErrors)("reports sharing as not enabled when replacing shares: %s", async error => {
+    results = [[{ id: 7, userId: 1 }], []];
+    removeWhere.mockRejectedValueOnce(error);
+    const { setSessionShares } = await import("./db.js");
+    await expect(setSessionShares(7, 1, [2])).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: "分享功能尚未啟用" });
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it.each(missingTableErrors)("still deletes an owned record without the sharing table: %s", async error => {
+    results = [[{ id: 7 }]];
+    removeWhere.mockRejectedValueOnce(error);
+    const { deleteSurfSession } = await import("./db.js");
+    const { sessionShares, surfSessions } = await import("../drizzle/schema.js");
+    await deleteSurfSession(7, 1);
+    expect(remove.mock.calls.map(call => call[0])).toEqual([sessionShares, surfSessions]);
+  });
+
+  it("propagates unrelated errors rather than hiding them", async () => {
+    const error = Object.assign(new Error("Connection lost"), { code: "PROTOCOL_CONNECTION_LOST", errno: 2013 });
+    const { getSessionShareIds, getSessionsSharedWithUser, canFriendViewSession, setSessionShares, deleteSurfSession } = await import("./db.js");
+    results = [error, error, error, [{ id: 7, userId: 1 }], [], [{ id: 7 }]];
+    await expect(getSessionShareIds(7)).rejects.toBe(error);
+    await expect(getSessionsSharedWithUser(2)).rejects.toBe(error);
+    await expect(canFriendViewSession(7, 2)).rejects.toBe(error);
+    removeWhere.mockRejectedValueOnce(error);
+    await expect(setSessionShares(7, 1, [])).rejects.toBe(error);
+    removeWhere.mockRejectedValueOnce(error);
+    await expect(deleteSurfSession(7, 1)).rejects.toBe(error);
+    expect(remove).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not loop on a cyclic error cause", async () => {
+    const error = Object.assign(new Error("Other error"), { cause: {} });
+    error.cause = { cause: error };
+    results = [error];
+    const { getSessionShareIds } = await import("./db.js");
+    await expect(getSessionShareIds(7)).rejects.toBe(error);
+  });
+
   it("replaces the set, deduplicates, and drops self, pending, rejected and non-friends", async () => {
     results = [[{ id: 7, userId: 1 }], [
       { userId: 1, friendId: 2, status: "accepted" },

@@ -5,6 +5,7 @@ import { InsertUser, users } from "../drizzle/schema.js";
 import { databaseConfig } from "./_core/databaseConfig.js";
 import { friendships, sessionShares, surfSessions } from "../drizzle/schema.js";
 import { withPlaybackUrl } from "./r2.js";
+import { TRPCError } from "@trpc/server";
 
 let _db: MySql2Database<Record<string, unknown>> | null = null;
 
@@ -180,11 +181,26 @@ export async function getSessionById(sessionId: number, userId: number) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+function isMissingTableError(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  while (error && typeof error === "object" && !seen.has(error)) {
+    seen.add(error);
+    const detail = error as { code?: string; errno?: number; cause?: unknown };
+    if (detail.code === "ER_NO_SUCH_TABLE" || detail.errno === 1146) return true;
+    error = detail.cause;
+  }
+  return false;
+}
+
 export async function getSessionShareIds(sessionId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const rows = await db.select({ friendId: sessionShares.friendId }).from(sessionShares)
-    .where(eq(sessionShares.sessionId, sessionId));
+    .where(eq(sessionShares.sessionId, sessionId))
+    .catch(error => {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    });
   return rows.map(row => row.friendId);
 }
 
@@ -204,6 +220,9 @@ export async function setSessionShares(sessionId: number, ownerId: number, frien
     await tx.delete(sessionShares).where(eq(sessionShares.sessionId, sessionId));
     if (ids.length) await tx.insert(sessionShares).values(ids.map(friendId => ({ sessionId, friendId })));
     return ids;
+  }).catch(error => {
+    if (isMissingTableError(error)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "分享功能尚未啟用", cause: error });
+    throw error;
   });
 }
 
@@ -224,7 +243,11 @@ export async function getSessionsSharedWithUser(viewerId: number, sessionId?: nu
       sessionId === undefined ? undefined : eq(surfSessions.id, sessionId),
       exists(db.select({ id: friendships.id }).from(friendships).where(acceptedFriendship(viewerId))),
     ))
-    .orderBy(desc(surfSessions.date), desc(surfSessions.createdAt), desc(surfSessions.id));
+    .orderBy(desc(surfSessions.date), desc(surfSessions.createdAt), desc(surfSessions.id))
+    .catch(error => {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    });
   return rows.map(({ session, ownerName }) => ({ ...withPlaybackUrl(session), ownerName }));
 }
 
@@ -235,7 +258,10 @@ export async function canFriendViewSession(sessionId: number, viewerId: number) 
     .innerJoin(surfSessions, eq(surfSessions.id, sessionShares.sessionId))
     .where(and(eq(sessionShares.sessionId, sessionId), eq(sessionShares.friendId, viewerId),
       exists(db.select({ id: friendships.id }).from(friendships).where(acceptedFriendship(viewerId))),
-    )).limit(1);
+    )).limit(1).catch(error => {
+      if (isMissingTableError(error)) return [];
+      throw error;
+    });
   return rows.length > 0;
 }
 
@@ -576,7 +602,9 @@ export async function deleteSurfSession(sessionId: number, userId: number) {
     const [session] = await tx.select({ id: surfSessions.id }).from(surfSessions)
       .where(and(eq(surfSessions.id, sessionId), eq(surfSessions.userId, userId))).for("update");
     if (!session) return;
-    await tx.delete(sessionShares).where(eq(sessionShares.sessionId, sessionId));
+    await tx.delete(sessionShares).where(eq(sessionShares.sessionId, sessionId)).catch(error => {
+      if (!isMissingTableError(error)) throw error;
+    });
     return tx.delete(surfSessions)
     .where(
       and(
