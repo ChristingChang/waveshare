@@ -21,12 +21,29 @@ export function photoFileError(file: File) {
   return null;
 }
 
+// Most browsers other than Safari cannot show HEIC, so convert it to JPEG before upload.
+export async function toDisplayablePhoto(file: File): Promise<File> {
+  const type = photoContentType(file);
+  if (type !== "image/heic" && type !== "image/heif") return file;
+  const { default: heic2any } = await import("heic2any");
+  const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+  const blob = Array.isArray(converted) ? converted[0] : converted;
+  return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+}
+
 export async function uploadPhotos(
   files: File[],
   presign: (input: { contentType: PhotoContentType; size: number }) => Promise<{ uploadUrl: string; photoPath: string }>,
 ) {
   const paths: string[] = [];
-  for (const file of files) {
+  for (const original of files) {
+    let file: File;
+    try {
+      file = await toDisplayablePhoto(original);
+    } catch {
+      throw new Error(`照片「${original.name}」無法轉換，請改用 JPG 或 PNG`);
+    }
+    if (file.size > MAX_PHOTO_BYTES) throw new Error(`「${original.name}」轉換後超過 20MB`);
     const contentType = photoContentType(file);
     if (!contentType) throw new Error(`照片「${file.name}」格式不支援`);
     const { uploadUrl, photoPath } = await presign({ contentType, size: file.size });
