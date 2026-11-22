@@ -204,6 +204,11 @@ describe("CWA parsers", () => {
   });
 });
 describe("source selection and aggregation", () => {
+  it("stores circular means as integer bearings normalized below 360", () => {
+    const rows = (values: number[]) => values.map((degrees, i) => ({time: input.date + "T" + String(i + 6).padStart(2, "0") + ":00", swellDirection: degrees}));
+    expect(aggregate(rows([30, 43]), "swellDirection", input.date, null, "test")).toEqual({degrees: 37, source: "test"});
+    expect(aggregate(rows([359, 0]), "swellDirection", input.date, null, "test")).toEqual({degrees: 0, source: "test"});
+  });
   it("uses named CWA area today, not a closer wrong township", async () => {
     const result = await fetchSurfConditions(input);
     expect(result?.waveHeight).toEqual({

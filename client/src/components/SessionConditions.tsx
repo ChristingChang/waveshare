@@ -70,7 +70,7 @@ export function SessionConditions({
         {swellDirection && (
           <span title={swellDirection.source}>
             <Compass className={icon} />
-            湧浪 {bearing(swellDirection)} {rounded(swellDirection.degrees)}°
+            湧浪 {bearing(swellDirection)} {Math.round(swellDirection.degrees) % 360}°
           </span>
         )}
         {windSpeed && (
