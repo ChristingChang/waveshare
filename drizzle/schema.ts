@@ -59,6 +59,8 @@ export const surfSessions = mysqlTable("surf_sessions", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD format
+  surfHour: int("surfHour"),
+  conditions: text("conditions"),
   spotName: varchar("spotName", { length: 255 }).notNull(),
   spotLat: varchar("spotLat", { length: 50 }),
   spotLng: varchar("spotLng", { length: 50 }),

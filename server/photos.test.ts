@@ -13,6 +13,7 @@ import {
 } from "./db.js";
 import { isR2PhotoPath } from "./photos.js";
 import { reservePhotoUpload } from "./videoUploads.js";
+vi.mock("./surfConditions", () => ({ conditionsForSession: vi.fn().mockResolvedValue(null) }));
 
 vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl: vi.fn() }));
 vi.mock("./_core/env.js", () => ({ ENV: {
@@ -119,7 +120,7 @@ describe("photo paths and uploads", () => {
 describe("record photos", () => {
   it("creates a record with photos and no video", async () => {
     await caller.surfSessions.create({ ...record, photoPaths: [photo(1), photo(2)] });
-    expect(createSurfSession).toHaveBeenCalledWith({ ...record, userId: 42, videoPath: "", videoUrl: "" }, [photo(1), photo(2)]);
+    expect(createSurfSession).toHaveBeenCalledWith({ ...record, userId: 42, videoPath: "", videoUrl: "", conditions: null }, [photo(1), photo(2)]);
   });
 
   it("rejects foreign, duplicate or more than 10 photos", async () => {
