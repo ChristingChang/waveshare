@@ -5,6 +5,7 @@ import { appRouter } from "../routers.js";
 import { createContext } from "./context.js";
 import { cleanupRouter } from "../cleanupRouter.js";
 import { videoPlaybackRouter } from "../videoPlayback.js";
+import { photoViewRouter } from "../photos.js";
 
 export function createApp() {
   const app = express();
@@ -13,6 +14,7 @@ export function createApp() {
   registerOAuthRoutes(app);
   app.use("/api/cron", cleanupRouter);
   app.use("/api/videos", videoPlaybackRouter);
+  app.use("/api/photos", photoViewRouter);
   app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
   return app;
 }

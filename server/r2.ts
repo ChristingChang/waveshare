@@ -14,11 +14,11 @@ export const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
 
 export const PLAYBACK_URL_TTL_SECONDS = 15 * 60;
 
-function hasR2Config() {
+export function hasR2Config() {
   return Boolean(ENV.r2AccountId && ENV.r2AccessKeyId && ENV.r2SecretAccessKey && ENV.r2Bucket);
 }
 
-function createR2Client(options: { requestChecksumCalculation?: "WHEN_REQUIRED" } = {}) {
+export function createR2Client(options: { requestChecksumCalculation?: "WHEN_REQUIRED" } = {}) {
   return new S3Client({
     endpoint: `https://${ENV.r2AccountId}.r2.cloudflarestorage.com`,
     region: "auto",
@@ -41,7 +41,7 @@ export function playbackPath(sessionId: number) {
 }
 
 export function withPlaybackUrl<T extends { id: number; userId: number; videoPath: string; videoUrl: string }>(session: T): T {
-  return { ...session, videoUrl: playbackPath(session.id) };
+  return { ...session, videoUrl: session.videoPath || session.videoUrl ? playbackPath(session.id) : "" };
 }
 
 export function validateVideoReference(userId: number, videoPath: string) {

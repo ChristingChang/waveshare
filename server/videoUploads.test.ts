@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MySqlDialect } from "drizzle-orm/mysql-core";
 import { getDb } from "./db.js";
-import { DAILY_UPLOAD_LIMIT, reserveVideoUpload } from "./videoUploads.js";
-import { users, videoUploads } from "../drizzle/schema.js";
+import { DAILY_PHOTO_UPLOAD_LIMIT, DAILY_UPLOAD_LIMIT, reservePhotoUpload, reserveVideoUpload } from "./videoUploads.js";
+import { photoUploads, users, videoUploads } from "../drizzle/schema.js";
 
 vi.mock("./db.js", () => ({ getDb: vi.fn() }));
 
@@ -56,5 +56,20 @@ describe("rolling upload reservations", () => {
     lock.mockResolvedValueOnce([{ id: 42 }]).mockResolvedValueOnce([]);
     values.mockRejectedValueOnce(new Error("insert failed"));
     await expect(reserveVideoUpload(42, "unused")).rejects.toThrow("insert failed");
+  });
+});
+
+describe("rolling photo upload reservations", () => {
+  it("records a photo upload and rejects the 101st in 24 hours", async () => {
+    const path = "r2/surf-photos/42/photo-123-0123456789abcdef.jpg";
+    lock.mockResolvedValueOnce([{ id: 42 }]).mockResolvedValueOnce([]);
+    await reservePhotoUpload(42, path);
+    expect(from.mock.calls.map(call => call[0])).toEqual([users, photoUploads]);
+    expect(values).toHaveBeenCalledWith({ userId: 42, photoPath: path });
+
+    values.mockClear();
+    lock.mockResolvedValueOnce([{ id: 42 }]).mockResolvedValueOnce(Array.from({ length: DAILY_PHOTO_UPLOAD_LIMIT }, (_, id) => ({ id })));
+    await expect(reservePhotoUpload(42, path)).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    expect(values).not.toHaveBeenCalled();
   });
 });
