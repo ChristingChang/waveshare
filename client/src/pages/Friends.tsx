@@ -172,7 +172,7 @@ export default function Friends() {
               <CardContent>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="輸入姓名或 Email"
+                    placeholder="輸入姓名"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => {
@@ -195,9 +195,6 @@ export default function Friends() {
                         <div>
                           <div className="font-medium text-foreground">
                             {user.name || "未命名使用者"}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {user.email}
                           </div>
                         </div>
                         <Button

@@ -3,6 +3,7 @@ import { MySqlDialect } from "drizzle-orm/mysql-core";
 import { drizzle } from "drizzle-orm/mysql2";
 
 vi.mock("drizzle-orm/mysql2", () => ({ drizzle: vi.fn() }));
+vi.mock("mysql2/promise", () => ({ createPool: vi.fn(() => ({})) }));
 
 const limit = vi.fn();
 const where = vi.fn(() => ({ limit }));

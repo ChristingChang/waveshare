@@ -1,17 +1,25 @@
 import { desc, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
+import { createPool } from "mysql2/promise";
 import { InsertUser, users } from "../drizzle/schema.js";
-import { ENV } from './_core/env.js';
+import { databaseConfig } from "./_core/databaseConfig.js";
 
-let _db: ReturnType<typeof drizzle> | null = null;
+let _db: MySql2Database<Record<string, unknown>> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const pool = createPool({
+        ...databaseConfig(process.env.DATABASE_URL, process.env.DATABASE_SSL),
+        connectionLimit: 3,
+        maxIdle: 1,
+        idleTimeout: 60_000,
+        waitForConnections: true,
+      });
+      _db = drizzle(pool);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.warn("[Database] Failed to initialize connection pool");
       _db = null;
     }
   }
@@ -55,9 +63,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
     }
 
     if (!values.lastSignedIn) {
@@ -404,13 +409,13 @@ export async function getPendingRequests(userId: number) {
   return result;
 }
 
-// Search users by name or email
+// Search users by name
 export async function searchUsers(query: string, currentUserId: number) {
   const db = await getDb();
   if (!db) return [];
   
   const { users } = await import("../drizzle/schema.js");
-  const { or, and, like, ne } = await import("drizzle-orm");
+  const { and, like, ne } = await import("drizzle-orm");
   
   const searchPattern = `%${query}%`;
   
@@ -418,15 +423,11 @@ export async function searchUsers(query: string, currentUserId: number) {
     .select({
       id: users.id,
       name: users.name,
-      email: users.email,
     })
     .from(users)
     .where(
       and(
-        or(
-          like(users.name, searchPattern),
-          like(users.email, searchPattern)
-        ),
+        like(users.name, searchPattern),
         ne(users.id, currentUserId)
       )
     )
