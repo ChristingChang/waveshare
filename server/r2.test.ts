@@ -14,7 +14,7 @@ vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl: vi.fn() }));
 vi.mock("./db.js", () => ({
   createSurfSession: vi.fn(), deleteSurfSession: vi.fn(), updateSurfSession: vi.fn(), addSessionCompanions: vi.fn(), isVideoPathReferenced: vi.fn(),
   getUserRecentSessions: vi.fn(), getUserAllSessions: vi.fn(), getUserSessionsByDateRange: vi.fn(), getSessionById: vi.fn(),
-  getSessionPhotos: vi.fn(async () => []), removeSessionPhotos: vi.fn(async () => []), addSessionPhotos: vi.fn(), isPhotoPathReferenced: vi.fn(),
+  getSessionPhotos: vi.fn(async () => []), removeSessionPhotos: vi.fn(async () => []), changeSessionPhotos: vi.fn(async () => []), isPhotoPathReferenced: vi.fn(),
   getSessionsSharedWithUser: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("./_core/env.js", () => ({ ENV: {

@@ -161,10 +161,10 @@ export const appRouter = router({
           validateVideoReference(ctx.user.id, input.videoPath);
         }
         validatePhotoPaths(ctx.user.id, addPhotoPaths);
-        const { updateSurfSession, getSessionById, getSessionPhotos, addSessionPhotos, removeSessionPhotos } = await import("./db.js");
+        const { updateSurfSession, getSessionById, getSessionPhotos, changeSessionPhotos } = await import("./db.js");
 
-        let removedPhotoPaths: string[] = [];
-        if (addPhotoPaths.length || removePhotoIds.length) {
+        const changesPhotos = addPhotoPaths.length > 0 || removePhotoIds.length > 0;
+        if (changesPhotos) {
           if (!await getSessionById(id, ctx.user.id)) {
             throw new TRPCError({ code: "NOT_FOUND", message: "找不到此紀錄" });
           }
@@ -173,13 +173,14 @@ export const appRouter = router({
           if (kept + addPhotoPaths.length > MAX_PHOTOS_PER_SESSION) {
             throw new TRPCError({ code: "BAD_REQUEST", message: `每筆紀錄最多 ${MAX_PHOTOS_PER_SESSION} 張照片` });
           }
-          removedPhotoPaths = (await removeSessionPhotos(id, ctx.user.id, removePhotoIds)).map(photo => photo.photoPath);
-          await addSessionPhotos(id, ctx.user.id, addPhotoPaths);
         }
-        
+
         const fields = input.videoPath === undefined ? updates : { ...updates, videoUrl: "" };
         const result = Object.keys(fields).length ? await updateSurfSession(id, ctx.user.id, fields) : undefined;
-        await deleteUnreferencedPhotos(ctx.user.id, removedPhotoPaths);
+        if (changesPhotos) {
+          const removed = await changeSessionPhotos(id, ctx.user.id, removePhotoIds, addPhotoPaths);
+          await deleteUnreferencedPhotos(ctx.user.id, removed.map(photo => photo.photoPath));
+        }
         
         // Note: Companions feature is prepared but not fully integrated
         // Will be completed in future update
