@@ -11,11 +11,11 @@ export async function captureVideoFrame(file: File): Promise<File> {
 
   try {
     return await new Promise<File>((resolve, reject) => {
-      let seeked = false;
+      let canCapture = false;
       let encoding = false;
 
       function capture() {
-        if (!seeked || encoding || video.readyState < video.HAVE_CURRENT_DATA) return;
+        if (!canCapture || encoding || video.readyState < video.HAVE_CURRENT_DATA) return;
         encoding = true;
 
         try {
@@ -44,7 +44,11 @@ export async function captureVideoFrame(file: File): Promise<File> {
       video.onerror = () => reject(new Error("Could not decode video"));
       video.onloadedmetadata = () => {
         try {
-          if (!Number.isFinite(video.duration) || video.duration <= 0) throw new Error("Invalid video duration");
+          if (!Number.isFinite(video.duration) || video.duration <= 0) {
+            canCapture = true;
+            capture();
+            return;
+          }
           video.currentTime = video.duration > 1 ? 1 : video.duration * 0.1;
         } catch (error) {
           reject(error);
@@ -52,7 +56,7 @@ export async function captureVideoFrame(file: File): Promise<File> {
       };
       video.onloadeddata = capture;
       video.onseeked = () => {
-        seeked = true;
+        canCapture = true;
         capture();
       };
       video.src = url;

@@ -57,6 +57,19 @@ describe("captureVideoFrame", () => {
       expect(revokeObjectURL).toHaveBeenCalledWith("blob:video");
     });
 
+  it.each([Infinity, 0])("captures the first decoded frame without seeking when duration is %s", async duration => {
+    const { drawImage, source, video } = mockVideoCapture(duration, 1920, 1080);
+    video.readyState = 1;
+    const result = captureVideoFrame(source);
+    video.onloadedmetadata();
+    expect(video.currentTime).toBe(0);
+    expect(drawImage).not.toHaveBeenCalled();
+    video.readyState = video.HAVE_CURRENT_DATA;
+    video.onloadeddata();
+    await expect(result).resolves.toMatchObject({ name: "video-frame.jpg", type: "image/jpeg" });
+    expect(drawImage).toHaveBeenCalledWith(video, 0, 0, 1920, 1080);
+  });
+
   it("rejects a decoder error and releases the local video URL", async () => {
     const { revokeObjectURL, source, video } = mockVideoCapture(8, 1920, 1080);
     const result = captureVideoFrame(source);
