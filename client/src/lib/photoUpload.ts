@@ -47,7 +47,12 @@ export async function uploadPhotos(
     const contentType = photoContentType(file);
     if (!contentType) throw new Error(`照片「${file.name}」格式不支援`);
     const { uploadUrl, photoPath } = await presign({ contentType, size: file.size });
-    const response = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": contentType }, body: file });
+    let response: Response;
+    try {
+      response = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": contentType }, body: file });
+    } catch {
+      throw new Error("照片上傳失敗，請檢查網路連線後重試");
+    }
     if (!response.ok) throw new Error("照片上傳失敗，請稍後重試");
     paths.push(photoPath);
   }
