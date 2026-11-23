@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { uploadErrorMessage } from "@/lib/uploadError";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { uploadPhotos } from "@/lib/photoUpload";
+import { captureVideoFrame } from "@/lib/videoFrame";
 
 export default function Upload() {
   const [, setLocation] = useLocation();
@@ -104,7 +105,15 @@ export default function Upload() {
         }
         videoPath = presigned.videoPath;
       }
-      const photoPaths = await uploadPhotos(photoFiles, presignPhotoUpload.mutateAsync);
+      let photoPaths = await uploadPhotos(photoFiles, presignPhotoUpload.mutateAsync);
+      if (videoFile && photoFiles.length === 0) {
+        try {
+          const frame = await captureVideoFrame(videoFile);
+          photoPaths = await uploadPhotos([frame], presignPhotoUpload.mutateAsync);
+        } catch {
+          // A generated photo is optional; keep saving the uploaded video.
+        }
+      }
 
       // Create session record
       await createSession.mutateAsync({
