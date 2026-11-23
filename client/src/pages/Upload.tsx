@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { TRPCClientError } from "@trpc/client";
+import { uploadErrorMessage } from "@/lib/uploadError";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { uploadPhotos } from "@/lib/photoUpload";
 
@@ -119,9 +119,7 @@ export default function Upload() {
       });
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error(error instanceof TRPCClientError && error.data?.code === "TOO_MANY_REQUESTS"
-        ? error.message : error instanceof Error && /影片|照片/.test(error.message)
-        ? error.message : "上傳失敗，請檢查網路連線後重試");
+      toast.error(uploadErrorMessage(error));
       setUploading(false);
     }
   };

@@ -46,4 +46,21 @@ describe("photo upload helpers", () => {
     const presign = vi.fn().mockResolvedValue({ uploadUrl: "https://put/1", photoPath: "p1" });
     await expect(uploadPhotos([file("a.jpg", "image/jpeg")], presign)).rejects.toThrow("照片上傳失敗");
   });
+
+  it("identifies a thrown R2 PUT failure as a photo upload failure", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    const presign = vi.fn().mockResolvedValue({ uploadUrl: "https://put/1", photoPath: "p1" });
+    await expect(uploadPhotos([file("a.jpg", "image/jpeg")], presign)).rejects.toThrow("照片上傳失敗，請檢查網路連線後重試");
+  });
+
+  it("preserves presign errors instead of labeling them as PUT failures", async () => {
+    const error = new Error("照片功能尚未啟用");
+    await expect(uploadPhotos([file("a.jpg", "image/jpeg")], vi.fn().mockRejectedValue(error))).rejects.toBe(error);
+  });
+
+  it("does nothing when no photos are selected", async () => {
+    const presign = vi.fn();
+    await expect(uploadPhotos([], presign)).resolves.toEqual([]);
+    expect(presign).not.toHaveBeenCalled();
+  });
 });

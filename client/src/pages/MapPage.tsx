@@ -4,11 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronDown, ChevronUp, MapPin, Star } from "lucide-react";
 import { Link } from "wouter";
 import { LeafletMap } from "@/components/LeafletMap";
+import { ShareCardButton } from "@/components/ShareCardButton";
+import { makeSpotsCard } from "@/lib/shareCards";
 import { SURF_SPOTS, getSpotCoordinates } from "@shared/surfSpots";
 
 export default function MapPage() {
-  const { data: sessions = [], isLoading } = trpc.surfSessions.getAll.useQuery();
+  const { data: sessions = [], isLoading, isSuccess } = trpc.surfSessions.getAll.useQuery();
   const [expandedSpot, setExpandedSpot] = useState<string | null>(null);
+  const spotsCard = useMemo(() => makeSpotsCard(sessions), [sessions]);
 
   const spotStats = useMemo(() => {
     const stats: Record<
@@ -99,7 +102,16 @@ export default function MapPage() {
 
         {/* Spot List Section */}
         <div>
-          <h2 className="text-lg font-semibold mb-3 text-foreground">我的浪點</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-foreground">
+              我的浪點{isSuccess && (
+                <span className="ml-2 text-sm text-muted-foreground">
+                  {spotsCard.visited}/{spotsCard.total}
+                </span>
+              )}
+            </h2>
+            {isSuccess && <ShareCardButton card={spotsCard} />}
+          </div>
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">載入中...</div>
           ) : spotStats.length > 0 ? (
