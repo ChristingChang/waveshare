@@ -7,7 +7,9 @@ import { createSurfSession, deleteSurfSession, updateSurfSession, getUserRecentS
 import { deleteR2Video } from "./r2.js";
 import type { TrpcContext } from "./_core/context.js";
 import { reserveVideoUpload } from "./videoUploads.js";
+import { conditionsForSession } from "./surfConditions";
 
+vi.mock("./surfConditions", () => ({ conditionsForSession: vi.fn() }));
 vi.mock("./videoUploads.js", () => ({ reserveVideoUpload: vi.fn() }));
 
 vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl: vi.fn() }));
@@ -29,6 +31,7 @@ const session = { date: "2025-11-21", spotName: "烏石港", waveQuality: 4, vid
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(conditionsForSession).mockResolvedValue(null);
   vi.mocked(isVideoPathReferenced).mockResolvedValue(false);
   vi.mocked(reserveVideoUpload).mockResolvedValue(undefined);
   vi.mocked(getSignedUrl).mockResolvedValue("https://signed.example.com/put");
@@ -250,7 +253,7 @@ describe("session video ownership", () => {
 
   it("accepts an owned path on create and update and never stores a public URL", async () => {
     await caller.surfSessions.create({ ...session, videoUrl: "https://evil.example.com/video.mp4" } as never);
-    expect(createSurfSession).toHaveBeenCalledWith({ ...session, userId: 42, videoUrl: "" }, []);
+    expect(createSurfSession).toHaveBeenCalledWith({ ...session, userId: 42, videoUrl: "", conditions: null }, []);
     await caller.surfSessions.update({ id: 7, videoPath, videoUrl: "https://evil.example.com/video.mp4" } as never);
     expect(updateSurfSession).toHaveBeenCalledWith(7, 42, { videoPath, videoUrl: "" });
   });
@@ -258,7 +261,7 @@ describe("session video ownership", () => {
   it("creates a record without a video", async () => {
     const { videoPath: _videoPath, ...withoutVideo } = session;
     await caller.surfSessions.create(withoutVideo);
-    expect(createSurfSession).toHaveBeenCalledWith({ ...withoutVideo, userId: 42, videoPath: "", videoUrl: "" }, []);
+    expect(createSurfSession).toHaveBeenCalledWith({ ...withoutVideo, userId: 42, videoPath: "", videoUrl: "", conditions: null }, []);
     await expect(caller.surfSessions.update({ id: 7, videoPath: "" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
