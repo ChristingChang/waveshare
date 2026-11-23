@@ -14,11 +14,13 @@ import {
 import { createShareCardFile, type ShareCard } from "@/lib/shareCards";
 
 type Preview = { file: File; url: string; canShare: boolean };
-type RenderResult = { photo?: File; preview: Preview } | { photo?: File; error: string };
+type CardSource = { card: ShareCard; recordPhotoUrl?: string };
+type Background = File | string | undefined;
+type RenderResult = { background: Background; preview: Preview } | { background: Background; error: string };
 
-function ShareCardPreview({ card }: { card: ShareCard }) {
+function ShareCardPreview({ card, recordPhotoUrl }: CardSource) {
   const input = useRef<HTMLInputElement>(null);
-  const [photo, setPhoto] = useState<File>();
+  const [background, setBackground] = useState<Background>(recordPhotoUrl);
   const [result, setResult] = useState<RenderResult>();
   const [sharing, setSharing] = useState(false);
 
@@ -26,18 +28,18 @@ function ShareCardPreview({ card }: { card: ShareCard }) {
     let active = true;
     let url: string | undefined;
 
-    createShareCardFile(card, photo).then(file => {
+    createShareCardFile(card, background).then(file => {
       if (!active) return;
       const canShare =
         typeof navigator.share === "function" &&
         navigator.canShare?.({ files: [file] }) === true;
       url = URL.createObjectURL(file);
-      setResult({ photo, preview: { file, url, canShare } });
+      setResult({ background, preview: { file, url, canShare } });
     }).catch(() => {
       if (active) {
         setResult({
-          photo,
-          error: photo ? "無法使用這張照片，請改用另一張 JPG、PNG 或 HEIC 圖片（20 MB 以下）。" : "無法產生圖卡，請關閉後再試。",
+          background,
+          error: background instanceof File ? "無法使用這張照片，請改用另一張 JPG、PNG 或 HEIC 圖片（20 MB 以下）。" : "無法產生圖卡，請關閉後再試。",
         });
       }
     });
@@ -46,7 +48,7 @@ function ShareCardPreview({ card }: { card: ShareCard }) {
       active = false;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [card, photo]);
+  }, [card, background]);
 
   async function shareImage(file: File) {
     setSharing(true);
@@ -61,8 +63,13 @@ function ShareCardPreview({ card }: { card: ShareCard }) {
     }
   }
 
-  const current = result?.photo === photo ? result : undefined;
+  const current = result?.background === background ? result : undefined;
   const preview = current && "preview" in current ? current.preview : undefined;
+
+  function changeBackground(next: Background) {
+    setResult(undefined);
+    setBackground(next);
+  }
 
   return (
     <>
@@ -88,15 +95,15 @@ function ShareCardPreview({ card }: { card: ShareCard }) {
             hidden
             onChange={event => {
               const file = event.currentTarget.files?.[0];
-              if (file) setPhoto(file);
+              if (file) changeBackground(file);
               event.currentTarget.value = "";
             }}
           />
           <Button type="button" variant="outline" size="sm" onClick={() => input.current?.click()}>
-            <ImagePlus /> {photo ? "更換照片" : "選擇背景照片"}
+            <ImagePlus /> {background instanceof File ? "更換照片" : "選擇背景照片"}
           </Button>
-          {photo && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => setPhoto(undefined)}>
+          {background && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => changeBackground(undefined)}>
               改用海浪插畫
             </Button>
           )}
@@ -120,11 +127,11 @@ function ShareCardPreview({ card }: { card: ShareCard }) {
   );
 }
 
-export function ShareCardButton({ card }: { card: ShareCard }) {
-  const [snapshot, setSnapshot] = useState<ShareCard>();
+export function ShareCardButton({ card, recordPhotoUrl }: CardSource) {
+  const [snapshot, setSnapshot] = useState<CardSource>();
 
   return (
-    <Dialog open={!!snapshot} onOpenChange={open => setSnapshot(open ? card : undefined)}>
+    <Dialog open={!!snapshot} onOpenChange={open => setSnapshot(open ? { card, recordPhotoUrl } : undefined)}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Image /> 分享圖卡
@@ -135,10 +142,10 @@ export function ShareCardButton({ card }: { card: ShareCard }) {
           <DialogTitle>分享圖卡</DialogTitle>
           <DialogDescription>
             下載 PNG 圖片，可用於 IG 限時動態或 LINE。
-            {card.kind === "record" && "背景照片只在此裝置處理，不會上傳。"}
+            {card.kind === "record" && "從相簿選擇的照片只在此裝置處理，不會上傳。"}
           </DialogDescription>
         </DialogHeader>
-        {snapshot && <ShareCardPreview card={snapshot} />}
+        {snapshot && <ShareCardPreview {...snapshot} />}
       </DialogContent>
     </Dialog>
   );

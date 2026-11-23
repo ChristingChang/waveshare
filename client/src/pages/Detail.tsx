@@ -180,7 +180,7 @@ export default function Detail() {
           <CardContent className="pt-6 space-y-4">
             {session.isOwner && (
               <div className="flex justify-end">
-                <ShareCardButton card={makeRecordCard(session)} />
+                <ShareCardButton card={makeRecordCard(session)} recordPhotoUrl={session.photos[0]?.url} />
               </div>
             )}
             {/* Wave Quality */}
