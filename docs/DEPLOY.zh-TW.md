@@ -73,12 +73,10 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 | `R2_SECRET_ACCESS_KEY` | 影片功能必填；R2 存取密鑰 |
 | `R2_BUCKET` | 影片功能必填；bucket 名稱 |
 | `CRON_SECRET` | 選填；另一組至少 16 字元的隨機密碼，啟用每日未使用影片清理；不要與 Session 金鑰共用 |
-| `VITE_APP_TITLE` | 建議填 `WaveShare 浪旅誌`；公開網頁標題 |
-| `VITE_APP_LOGO` | 建議填公開可讀取的圖示網址；非機密 |
 | `PORT` | 只供本機 / 自架使用，預設 3000；Vercel 不需填 |
 | `NODE_ENV` | Vercel 正式部署自動使用 `production`，不需手動填 |
 
-除了 `VITE_APP_TITLE`、`VITE_APP_LOGO`，上述資料都不要放到前端變數。`R2_PUBLIC_URL` 已不再使用，以前設定過的可以刪除。無需設定舊 Manus OAuth、Forge 或分析服務變數。
+上述設定不要放到會公開給瀏覽器的前端變數。分頁標題「WaveShare 浪旅誌」和海浪圖示已隨網站提供，不用在 Vercel 設定；若以前填過 `VITE_APP_TITLE` 或 `VITE_APP_LOGO`，可刪除。`R2_PUBLIC_URL` 也已不再使用。無需設定舊 Manus OAuth、Forge 或分析服務變數。
 
 ## 6. 初始化 / 更新資料庫
 
@@ -92,11 +90,14 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ## 7. 重新部署與確認
 
 1. 回到 Vercel **Deployments** → 目前版本 → **Redeploy**。
-2. 用未登入的視窗開啟網站，應自動前往 Google 登入與授權，完成後回到首頁；再測試登出與重新登入。
+2. 用未登入的視窗開啟網站，確認分頁標題和海浪圖示正確，先看到介紹頁及示範畫面，不會自動前往 Google。按「使用 Google 登入」才前往 Google，成功後回到首頁。從頁面上方按「登出」，應顯示介紹頁，不會自動再登入；再試一次手動登入。
 3. 在測試站新增一筆有影片的紀錄，以及一筆有照片、無影片的紀錄。確認本人能播放影片、點照片縮圖看大圖、編輯照片與刪除紀錄。選用的影片及照片直接上傳 R2，不受 Vercel 約 4.5 MB 的函式請求大小限制。
 4. 用不同帳號確認新紀錄預設不分享。指定好友並儲存後，對方可從好友頁打開紀錄及其影片或照片，但不能編輯。未登入或未被選中的好友直接開啟 `/api/videos/<紀錄編號>` 或 `/api/photos/<照片編號>` 會被擋下；取消分享後，指定好友也無法再向 WaveShare 取得新連結。先前取得的 R2 連結仍可能用到 15 分鐘的有效期結束。另確認舊的 `r2.dev` 或公開自訂網域網址已無法播放。
 5. 每位使用者在任意連續 24 小時內最多申請 10 次影片和 100 次照片上傳，未完成的申請也會計入。設定 `CRON_SECRET` 後，Vercel 每天清理未使用的上傳，細節見 [R2 教學](R2_SETUP.zh-TW.md)。
+6. 在自己的紀錄詳細頁與地圖頁確認「分享圖卡」能預覽並下載 PNG；用支援直接分享圖片的瀏覽器再確認「分享圖片」可傳送圖片檔。圖卡由瀏覽器產生，不需要額外的部署設定。
 
 好友分享（[#13](https://github.com/ChristingChang/waveshare/pull/13)）和照片（[#14](https://github.com/ChristingChang/waveshare/pull/14)）都未在實際的 Cloudflare R2 或正式資料庫上測試。請先完成上述測試站檢查，再正式上線。
 
 若登入失敗，先確認 Google redirect URI 完全一致、應用程式已發布為 In production、Secret 無多餘空白、TiDB 遷移已完成，並且已重新部署。不要將登入 code、存取 token、Cookie 或資料庫密碼貼到公開 issue。
+
+若新增或編輯紀錄時，畫面提示「照片功能尚未啟用」且缺少照片資料表，請確認網站連到哪個 TiDB Cloud 資料庫，並由管理員依[第 6 步](#6-初始化--更新資料庫)在該資料庫執行 [`drizzle/manual/0005_photos.sql`](../drizzle/manual/0005_photos.sql)。只重新部署不會建立資料表。若畫面顯示其他原因，請依提示處理；例如已達次數上限就稍後再試，不必重跑 SQL。
