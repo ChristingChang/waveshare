@@ -1,4 +1,4 @@
-import { SPOT_COORDINATES } from "./surfSpots";
+import { SPOT_COORDINATES } from "./surfSpots.js";
 
 export const normalizeSpotName = (name: string) =>
   name

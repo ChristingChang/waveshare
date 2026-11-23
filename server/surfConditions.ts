@@ -1,8 +1,8 @@
-import { distanceKm, resolveConditionSpot } from "../shared/conditionSpots";
+import { distanceKm, resolveConditionSpot } from "../shared/conditionSpots.js";
 import type {
   ConditionsSnapshot,
   ConditionTide,
-} from "../shared/surfConditions";
+} from "../shared/surfConditions.js";
 
 type Row = {
   time: string;
