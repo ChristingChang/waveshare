@@ -155,4 +155,45 @@ describe("share cards", () => {
     expect(context.drawImage).toHaveBeenCalledWith(expect.any(LocalImage), 575, 0, 450, 800, 0, 0, 1080, 1920);
     expect(png).toMatchObject({ name: "waveshare-surf-record.png", type: "image/png" });
   });
+
+  it.each(["loaded", "unavailable", "tainted"] as const)("exports a PNG when the record photo is %s", async state => {
+    const context = mockContext();
+    const request = vi.fn();
+    class RecordImage {
+      naturalWidth = 1080;
+      naturalHeight = 1920;
+      crossOrigin: string | undefined;
+      set src(url: string) {
+        request(url, this.crossOrigin);
+      }
+      async decode() {
+        if (state === "unavailable") throw new DOMException("Image unavailable", "EncodingError");
+      }
+    }
+    vi.stubGlobal("Image", RecordImage);
+    const canvases: HTMLCanvasElement[] = [];
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
+      this: HTMLCanvasElement,
+      callback
+    ) {
+      canvases.push(this);
+      if (state === "tainted" && canvases.length === 1) {
+        throw new DOMException("Tainted canvas", "SecurityError");
+      }
+      callback(new Blob(["PNG"]));
+    });
+
+    const png = await createShareCardFile(makeRecordCard(record), "/api/photos/12");
+
+    expect(request).toHaveBeenCalledWith("/api/photos/12", "anonymous");
+    expect(context.drawImage).toHaveBeenCalledTimes(state === "unavailable" ? 0 : 1);
+    if (state === "loaded") {
+      expect(context.arc).not.toHaveBeenCalled();
+    } else {
+      expect(context.arc).toHaveBeenCalled();
+    }
+    expect(canvases).toHaveLength(state === "tainted" ? 2 : 1);
+    if (state === "tainted") expect(canvases[1]).not.toBe(canvases[0]);
+    expect(png).toMatchObject({ name: "waveshare-surf-record.png", type: "image/png" });
+  });
 });

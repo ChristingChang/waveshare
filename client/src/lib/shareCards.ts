@@ -262,13 +262,18 @@ export function drawShareCard(ctx: CanvasRenderingContext2D, card: ShareCard, ph
   }
 }
 
+async function decodeImage(src: string, crossOrigin?: "anonymous") {
+  const image = new Image();
+  if (crossOrigin) image.crossOrigin = crossOrigin;
+  image.src = src;
+  await image.decode();
+  return image;
+}
+
 async function decodePhoto(file: File) {
   const url = URL.createObjectURL(file);
   try {
-    const image = new Image();
-    image.src = url;
-    await image.decode();
-    return image;
+    return await decodeImage(url);
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -290,8 +295,7 @@ async function loadPhoto(file: File) {
   }
 }
 
-export async function createShareCardFile(card: ShareCard, background?: File): Promise<File> {
-  const photo = background ? await loadPhoto(background) : undefined;
+async function encodeShareCard(card: ShareCard, photo?: HTMLImageElement): Promise<File> {
   const canvas = document.createElement("canvas");
   canvas.width = SHARE_CARD_WIDTH;
   canvas.height = SHARE_CARD_HEIGHT;
@@ -307,4 +311,15 @@ export async function createShareCardFile(card: ShareCard, background?: File): P
   });
   const filename = card.kind === "record" ? "waveshare-surf-record.png" : "waveshare-my-spots.png";
   return new File([png], filename, { type: "image/png" });
+}
+
+export async function createShareCardFile(card: ShareCard, background?: File | string): Promise<File> {
+  if (typeof background === "string") {
+    try {
+      return await encodeShareCard(card, await decodeImage(background, "anonymous"));
+    } catch {
+      return encodeShareCard(card);
+    }
+  }
+  return encodeShareCard(card, background ? await loadPhoto(background) : undefined);
 }
