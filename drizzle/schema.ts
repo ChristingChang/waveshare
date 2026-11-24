@@ -116,6 +116,11 @@ export const friendships = mysqlTable("friendships", {
 export type Friendship = typeof friendships.$inferSelect;
 export type InsertFriendship = typeof friendships.$inferInsert;
 
+export const friendInvites = mysqlTable("friend_invites", {
+  inviterId: int("inviterId").primaryKey(),
+  code: varchar("code", { length: 64 }).notNull().unique(),
+});
+
 /**
  * Session companions table - tracks who surfed together
  */

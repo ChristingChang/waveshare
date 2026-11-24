@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useRoute } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { BottomNav } from "./components/BottomNav";
@@ -9,6 +9,7 @@ import { AuthHeader } from "./components/AuthHeader";
 import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import Friends from "./pages/Friends";
+import Invite from "./pages/Invite";
 import Calendar from "./pages/Calendar";
 import MapPage from "./pages/MapPage";
 import Stats from "./pages/Stats";
@@ -19,6 +20,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 
 function Router() {
   const { isAuthenticated, loading } = useAuth();
+  const [, invite] = useRoute("/invite/:code");
 
   if (loading) {
     return (
@@ -27,6 +29,8 @@ function Router() {
       </div>
     );
   }
+
+  if (invite) return <Invite key={invite.code} code={invite.code} isAuthenticated={isAuthenticated} />;
 
   if (!isAuthenticated) {
     return <Landing />;
