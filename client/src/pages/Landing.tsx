@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUpRight, CalendarDays, ChartNoAxesCombined, Check, Image, LockKeyhole, NotebookPen, Timer, Users, Waves, Wind } from "lucide-react";
 import { getLoginUrl } from "@/const";
+import LandingPreviewImage from "@/components/LandingPreviewImage";
 import "./landing.css";
 
 function GoogleSignIn() {
@@ -20,7 +21,7 @@ function GoogleSignIn() {
 const previews = [
   {
     name: "衝浪紀錄",
-    image: "home",
+    image: "home" as const,
     alt: "WaveShare 首頁：總衝浪次數、浪點數量、平均評分與最近紀錄",
     icon: NotebookPen,
     title: "留下每次下水的故事",
@@ -28,7 +29,7 @@ const previews = [
   },
   {
     name: "衝浪日曆",
-    image: "calendar",
+    image: "calendar" as const,
     alt: "WaveShare 日曆：用月曆查看有衝浪紀錄的日期",
     icon: CalendarDays,
     title: "找回那天的好浪",
@@ -36,7 +37,7 @@ const previews = [
   },
   {
     name: "個人統計",
-    image: "stats",
+    image: "stats" as const,
     alt: "WaveShare 統計：衝浪次數、浪板使用統計與最常去的浪點",
     icon: ChartNoAxesCombined,
     title: "看見自己的衝浪足跡",
@@ -86,7 +87,7 @@ export default function Landing() {
               <path d="M-10 440C150 300 240 500 390 385S540 350 630 310" fill="none" stroke="#f8faf3" strokeWidth="2" />
             </svg>
             <div className="landing-hero-phone">
-              <img src="/landing/app-home.webp" width="390" height="844" alt="WaveShare 衝浪紀錄首頁預覽，使用示範資料" fetchPriority="high" />
+              <LandingPreviewImage image="home" alt="WaveShare 衝浪紀錄首頁預覽，使用示範資料" fetchPriority="high" />
             </div>
             <div className="landing-note landing-note-top"><Waves aria-hidden="true" size={22} /><span>離開海之後，<br /><strong>好浪還在這裡。</strong></span></div>
             <div className="landing-note landing-note-bottom"><span className="landing-note-dot" /><span>每一次下水，都是故事</span></div>
@@ -132,7 +133,7 @@ export default function Landing() {
                 <article className="landing-preview" key={image}>
                   <div className="landing-preview-heading"><span><Icon aria-hidden="true" size={17} />{name}</span><span>0{index + 1}</span></div>
                   <div className={`landing-preview-image landing-preview-${image}`}>
-                    <img src={`/landing/app-${image}.webp`} alt={alt} width="390" height="844" loading="lazy" decoding="async" />
+                    <LandingPreviewImage image={image} alt={alt} />
                   </div>
                   <h3>{title}</h3>
                   <p>{description}</p>
