@@ -1,4 +1,5 @@
 import { COOKIE_NAME } from "../shared/const.js";
+import { FRIEND_INVITE_CODE, friendInvitePath } from "../shared/friendInvite.js";
 import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
@@ -253,6 +254,17 @@ export const appRouter = router({
 
   // Friends router
   friends: router({
+    getInviteLink: protectedProcedure.mutation(async ({ ctx }) => {
+      const { getFriendInviteCode } = await import("./db.js");
+      return { path: friendInvitePath(await getFriendInviteCode(ctx.user.id)) };
+    }),
+
+    acceptInvite: protectedProcedure.input(z.object({ code: z.string().regex(FRIEND_INVITE_CODE) }))
+      .mutation(async ({ ctx, input }) => {
+        const { acceptFriendInvite } = await import("./db.js");
+        return acceptFriendInvite(ctx.user.id, input.code);
+      }),
+
     // Search users
     search: protectedProcedure
       .input(z.object({ query: z.string().min(1) }))

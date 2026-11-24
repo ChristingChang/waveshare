@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Search, UserPlus, Check, X, Loader2 } from "lucide-react";
+import { Users, Search, UserPlus, Check, X, Loader2, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Tabs,
@@ -16,7 +16,20 @@ import {
 export default function Friends() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("friends");
+  const search = useSearch();
+  const joined = new URLSearchParams(search).get("joined") === "1";
+  const inviteLink = trpc.friends.getInviteLink.useMutation();
   const sharedSessions = trpc.surfSessions.getSharedWithMe.useQuery();
+  const inviteUrl = inviteLink.data ? new URL(inviteLink.data.path, window.location.origin).href : "";
+
+  const copyInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      toast.success("已複製浪友邀請連結");
+    } catch {
+      toast.error("無法自動複製，請手動複製下方連結。");
+    }
+  };
 
   const { data: friends = [], refetch: refetchFriends } = trpc.friends.getFriends.useQuery();
   const { data: pendingRequests = [], refetch: refetchPending } = trpc.friends.getPendingRequests.useQuery();
@@ -74,6 +87,24 @@ export default function Friends() {
       </div>
 
       <div className="container max-w-2xl py-6 px-4 space-y-6">
+        {joined && <p role="status" className="text-sm font-medium">已成功加入浪友！</p>}
+        <Card>
+          <CardHeader><CardTitle>邀請浪友</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">把連結貼到 IG 或 LINE。收到連結的人可以加入你的浪友，但只能查看你選擇分享給他們的紀錄。</p>
+            {inviteUrl ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Input className="min-w-0 flex-1" aria-label="浪友邀請連結" value={inviteUrl} readOnly onFocus={event => event.currentTarget.select()} />
+                <Button variant="outline" onClick={copyInvite}><Link2 aria-hidden="true" /> 複製邀請連結</Button>
+              </div>
+            ) : (
+              <Button variant="outline" disabled={inviteLink.isPending} onClick={() => inviteLink.mutate()}>
+                <Link2 aria-hidden="true" /> {inviteLink.isPending ? "載入中…" : "取得邀請連結"}
+              </Button>
+            )}
+            {inviteLink.isError && <p role="alert" className="text-sm text-destructive">無法取得邀請連結，請稍後再試。</p>}
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader><CardTitle>好友分享給我的紀錄</CardTitle></CardHeader>
           <CardContent className="space-y-3">
