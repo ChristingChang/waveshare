@@ -40,6 +40,8 @@ describe("regular page authentication", () => {
     await waitFor(() => expect(logout).toHaveBeenCalledOnce());
     rerender(<App />);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("每一道浪，都值得留下。");
+    expect(screen.getByRole("figure", { name: "浪況自動帶入示意" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "你決定誰看得到" })).toBeTruthy();
     for (const link of screen.getAllByRole("link", { name: "使用 Google 登入" })) {
       expect(link.getAttribute("href")).toBe("/api/auth/google");
     }
