@@ -1,4 +1,5 @@
 export const ENV = {
+  cwaApiKey: process.env.CWA_API_KEY ?? "",
   cookieSecret: process.env.SESSION_SECRET || process.env.JWT_SECRET || "",
   databaseUrl: process.env.DATABASE_URL ?? "",
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",

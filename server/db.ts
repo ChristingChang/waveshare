@@ -259,6 +259,8 @@ export async function getSessionVideo(sessionId: number) {
 
 // Create new surf session
 export async function createSurfSession(session: {
+  surfHour?: number | null;
+  conditions?: string | null;
   userId: number;
   date: string;
   spotName: string;
@@ -394,6 +396,8 @@ export async function updateSurfSession(
   sessionId: number,
   userId: number,
   updates: {
+    surfHour?: number | null;
+    conditions?: string | null;
     videoPath?: string;
     videoUrl?: string;
     date?: string;

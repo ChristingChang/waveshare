@@ -1,3 +1,4 @@
+import { SurfHourSelect } from "@/components/SurfHourSelect";
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -28,6 +29,7 @@ export default function Upload() {
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0] || "");
   const [spotName, setSpotName] = useState("");
+  const [surfHour, setSurfHour] = useState<number | null>(null);
   const [boardType, setBoardType] = useState("");
   const [waveQuality, setWaveQuality] = useState(3);
   const [note, setNote] = useState("");
@@ -110,6 +112,7 @@ export default function Upload() {
       await createSession.mutateAsync({
         date,
         spotName: spotName.trim(),
+        surfHour,
         videoPath,
         photoPaths,
         boardType: boardType.trim() || undefined,
@@ -205,6 +208,7 @@ export default function Upload() {
               </div>
 
               {/* Spot Selector */}
+              <SurfHourSelect value={surfHour} onChange={setSurfHour} />
               <SpotSelector
                 value={spotName}
                 onChange={setSpotName}

@@ -1,3 +1,4 @@
+import { SurfHourSelect } from "@/components/SurfHourSelect";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ export default function Edit() {
 
   const [date, setDate] = useState("");
   const [spotName, setSpotName] = useState("");
+  const [surfHour, setSurfHour] = useState<number | null>(null);
   const [boardType, setBoardType] = useState("");
   const [waveQuality, setWaveQuality] = useState(3);
   const [note, setNote] = useState("");
@@ -52,6 +54,7 @@ export default function Edit() {
   useEffect(() => {
     if (session) {
       setDate(session.date);
+      setSurfHour(session.surfHour ?? null);
       setSpotName(session.spotName);
       setBoardType(session.boardType || "");
       setWaveQuality(session.waveQuality);
@@ -95,6 +98,7 @@ export default function Edit() {
       id: sessionId,
       date,
       spotName: spotName.trim(),
+      surfHour,
       boardType: boardType.trim() || undefined,
       note: note.trim() || undefined,
       waveQuality,
@@ -181,6 +185,7 @@ export default function Edit() {
               </div>
 
               {/* Spot Selector */}
+              <SurfHourSelect value={surfHour} onChange={setSurfHour} />
               <SpotSelector
                 value={spotName}
                 onChange={setSpotName}
