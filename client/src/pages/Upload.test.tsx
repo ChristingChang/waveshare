@@ -13,6 +13,12 @@ const { createSession, presignUpload, presignPhotoUpload } = vi.hoisted(() => ({
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     useUtils: () => ({}),
+    auth: {
+      me: { useQuery: () => ({ data: { id: 1 } }) },
+    },
+    friends: {
+      getFriends: { useQuery: () => ({ data: [], isPending: false, isError: false }) },
+    },
     surfSessions: {
       create: { useMutation: () => ({ mutateAsync: createSession }) },
       presignUpload: { useMutation: () => ({ mutateAsync: presignUpload }) },
