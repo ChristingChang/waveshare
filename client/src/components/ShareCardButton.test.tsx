@@ -93,4 +93,24 @@ describe("ShareCardButton", () => {
     expect(await screen.findByRole("link", { name: "下載圖片" })).toBeTruthy();
     expect(createShareCardFile).toHaveBeenLastCalledWith(card, local);
   });
+
+  it("automatically tries the record video when opened and allows opting out", async () => {
+    const png = new File(["PNG"], "card.png", { type: "image/png" });
+    vi.stubGlobal("URL", class extends URL {
+      static createObjectURL = vi.fn().mockReturnValue("blob:card");
+      static revokeObjectURL = vi.fn();
+    });
+    vi.mocked(createShareCardFile).mockResolvedValue(png);
+    const card = makeRecordCard({ spotName: "外澳", date: "2026-11-20", waveQuality: 4 });
+    render(<ShareCardButton card={card} recordVideoUrl="/api/videos/7" />);
+    expect(createShareCardFile).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "分享圖卡" }));
+    expect(await screen.findByRole("link", { name: "下載圖片" })).toBeTruthy();
+    expect(createShareCardFile).toHaveBeenLastCalledWith(card, undefined, "/api/videos/7");
+
+    fireEvent.click(screen.getByRole("button", { name: "改用海浪插畫" }));
+    expect(await screen.findByRole("link", { name: "下載圖片" })).toBeTruthy();
+    expect(createShareCardFile).toHaveBeenLastCalledWith(card, undefined);
+  });
 });
