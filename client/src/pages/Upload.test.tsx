@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createTRPCClient } from "@trpc/client";
+import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiLink } from "@/lib/trpc";
 import { captureVideoFrame } from "@/lib/videoFrame";
+import type { AppRouter } from "../../../server/routers";
 import Upload from "./Upload";
 
 const { createSession, presignUpload, presignPhotoUpload } = vi.hoisted(() => ({
@@ -10,7 +14,8 @@ const { createSession, presignUpload, presignPhotoUpload } = vi.hoisted(() => ({
   presignPhotoUpload: vi.fn(),
 }));
 
-vi.mock("@/lib/trpc", () => ({
+vi.mock("@/lib/trpc", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/trpc")>(),
   trpc: {
     useUtils: () => ({}),
     auth: { me: { useQuery: () => ({ data: { id: 1 } }) } },
@@ -69,9 +74,72 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.resetAllMocks();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+function submitPhoto(photo: File) {
+  render(<Upload />);
+  fireEvent.change(screen.getByLabelText("浪點"), { target: { value: "外澳" } });
+  fireEvent.change(screen.getByLabelText("照片"), { target: { files: [photo] } });
+  fireEvent.click(screen.getByRole("button", { name: "儲存" }));
+}
+
+describe("photo authorization", () => {
+  const client = createTRPCClient<AppRouter>({ links: [apiLink] });
+  const photo = new File(["photo"], "photo.jpg", { type: "image/jpeg" });
+
+  beforeEach(() => {
+    presignPhotoUpload.mockImplementation(input => client.surfSessions.presignPhotoUpload.mutate(input));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(toast, "error").mockImplementation(() => "");
+  });
+
+  it("aborts a stalled authorization and lets the user save again after the deadline", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockImplementationOnce((_input, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+    }));
+    submitPhoto(photo);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(9_999); });
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "上傳中..." }).disabled).toBe(true);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith("/api/trpc/surfSessions.presignPhotoUpload", expect.objectContaining({
+      credentials: "include", method: "POST", signal: expect.any(AbortSignal),
+    }));
+    const signal = vi.mocked(fetch).mock.calls[0][1]?.signal;
+    expect(signal?.aborted).toBe(false);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(signal?.aborted).toBe(true);
+    expect(toast.error).toHaveBeenCalledWith("照片上傳授權逾時，請稍後重試");
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "儲存" }).disabled).toBe(false);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(createSession).not.toHaveBeenCalled();
+  });
+
+  it("shows a retry message for a non-JSON 504 and saves the same photo on retry", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response("504: FUNCTION_INVOCATION_TIMEOUT", { status: 504 }))
+      .mockResolvedValueOnce(Response.json({
+        result: { data: { json: { uploadUrl: "https://r2.test/photo", photoPath: "photo-path" } } },
+      }));
+    submitPhoto(photo);
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("照片上傳授權逾時，請稍後重試"));
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(createSession).not.toHaveBeenCalled();
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "儲存" }).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "儲存" }));
+
+    await waitFor(() => expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
+      spotName: "外澳", photoPaths: ["photo-path"],
+    })));
+    expect(fetch).toHaveBeenLastCalledWith("https://r2.test/photo", expect.objectContaining({ method: "PUT", body: photo }));
+  });
 });
 
 function submitVideo(photo?: File) {
