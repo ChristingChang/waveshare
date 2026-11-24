@@ -14,7 +14,7 @@ export function getLineExternalUrl(href: string) {
   return url.href;
 }
 
-function InviteExternalBrowser({ code, isLine }: { code: string; isLine: boolean }) {
+function InviteExternalBrowser({ code, isLine, menuIcon }: { code: string; isLine: boolean; menuIcon: string }) {
   const attempted = useRef(false);
   const [copyStatus, setCopyStatus] = useState<"ready" | "copied" | "manual">("ready");
   const link = new URL(friendInvitePath(code), window.location.origin).href;
@@ -37,7 +37,7 @@ function InviteExternalBrowser({ code, isLine }: { code: string; isLine: boolean
 
   return (
     <div className="space-y-3">
-      <p>Google 登入無法在這個 App 內使用。請點右上角的「•••」選單，選擇在 Safari 或 Chrome 開啟，或複製連結後貼到瀏覽器。</p>
+      <p>Google 登入無法在這個 App 內使用。請點右上角的「{menuIcon}」選單，選擇在 Safari 或 Chrome 開啟，或複製連結後貼到瀏覽器。</p>
       <Button variant="outline" onClick={copyLink}>複製邀請連結</Button>
       {copyStatus === "copied" && <p role="status">已複製邀請連結</p>}
       {copyStatus === "manual" && (
@@ -87,7 +87,7 @@ export default function Invite({ code, isAuthenticated }: { code: string; isAuth
               {join.isPending ? "加入中…" : "加入浪友"}
             </Button>
           ) : isInApp ? (
-            <InviteExternalBrowser code={code} isLine={isLine} />
+            <InviteExternalBrowser code={code} isLine={isLine} menuIcon={/Android/i.test(userAgent) ? "⋮" : "•••"} />
           ) : (
             <form action="/api/auth/google/invite" method="post">
               <input type="hidden" name="code" value={code} />
