@@ -26,15 +26,15 @@ afterAll(async () => {
 
 describe("public legal pages", () => {
   it.each([
-    { route: "/privacy", title: "隱私權政策", content: ["已驗證電子郵件", "sub", "Cloudflare R2", "任何持有影片連結的人都可以觀看", "不會出售", "Cookie", "TiDB Cloud", "Vercel"] },
-    { route: "/terms", title: "服務條款", content: ["所有權", "MP4", "MOV", "WebM", "100 MiB", "24 小時", "10 次", "台灣", "as-is"] },
+    { route: "/privacy", title: "隱私權政策", content: ["已驗證電子郵件", "sub", "Cloudflare R2 儲存新上傳的影片與照片", "目前分享的好友", "有效期 15 分鐘", "即使分享權限之後已取消", "不會出售", "Cookie", "TiDB Cloud", "Vercel"] },
+    { route: "/terms", title: "服務條款", content: ["所有權", "不會授予他人存取權", "有效期 15 分鐘", "不會使已核發的連結提前失效", "MP4", "MOV", "WebM", "100 MiB", "24 小時", "10 次", "台灣", "as-is"] },
   ])("serves complete $route HTML without authentication or JavaScript", async ({ route, title, content }) => {
     const response = await fetch(`${origin}${route}`);
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     const html = await response.text();
     expect(html).toContain(`<h1>${title}</h1>`);
-    expect(html).toContain("2026-11-22");
+    expect(html).toContain("2026-11-24");
     expect(html).toContain("https://github.com/ChristingChang/waveshare/issues");
     expect(html).not.toContain("<script");
     for (const text of content) expect(html).toContain(text);
