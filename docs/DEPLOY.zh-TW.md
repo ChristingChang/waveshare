@@ -89,7 +89,8 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 2. **好友分享（0004）：** 開啟 [`drizzle/0004_session_shares.sql`](../drizzle/0004_session_shares.sql)，把內容貼到 SQL Editor，刪除 `--> statement-breakpoint` 那一行後執行，建立 `session_shares` 表及其索引。若已套用 0004，不要重跑。
 3. **照片（0005）：** 開啟 [`drizzle/manual/0005_photos.sql`](../drizzle/manual/0005_photos.sql)，整份貼到 SQL Editor 執行，建立 `photo_uploads` 和 `session_photos`。這份檔案可重複執行；不要另外執行 `drizzle/0005_photos.sql`，它是給 Drizzle 工具使用的同一項更新。
 4. **自動浪況與下水時間（0006，部署前必做）：** 開啟 [`drizzle/manual/0006_surf_conditions.sql`](../drizzle/manual/0006_surf_conditions.sql)，整份貼到 SQL Editor 執行，在 `surf_sessions` 加入可留空的 `surfHour`（下水時間）與 `conditions`（自動浪況）欄位。這份檔案可重複執行；不要另外執行 `drizzle/0006_surf_conditions.sql`。即使不設定 `CWA_API_KEY`，仍須先加欄位，否則網站無法正常讀取紀錄。
-5. 確認上述三張新表及兩個新欄位都出現在正確的資料庫，再回 Vercel 重新部署。如果 0004 曾執行到一半或不確定某次更新是否已完成，先請熟悉資料庫的人核對，不要直接重跑。手動貼 SQL 不會更新 Drizzle 的遷移紀錄；同一資料庫不要再用 `pnpm db:push` 或 `pnpm exec drizzle-kit migrate` 重跑已手動套用的檔案。
+5. **浪友邀請連結（0007）：** 開啟 [`drizzle/manual/0007_friend_invites.sql`](../drizzle/manual/0007_friend_invites.sql)，整份貼到 SQL Editor 執行，建立 `friend_invites` 表。這份檔案可重複執行；不要另外執行 `drizzle/0007_friend_invites.sql`。
+6. 確認上述四張新表及兩個新欄位都出現在正確的資料庫，再回 Vercel 重新部署。如果 0004 曾執行到一半或不確定某次更新是否已完成，先請熟悉資料庫的人核對，不要直接重跑。手動貼 SQL 不會更新 Drizzle 的遷移紀錄；同一資料庫不要再用 `pnpm db:push` 或 `pnpm exec drizzle-kit migrate` 重跑已手動套用的檔案。
 
 ## 7. 重新部署與確認
 

@@ -1,9 +1,10 @@
-import { and, desc, eq, exists, or } from "drizzle-orm";
+import { and, desc, eq, exists, or, sql } from "drizzle-orm";
+import { randomBytes } from "node:crypto";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2/promise";
 import { InsertUser, users } from "../drizzle/schema.js";
 import { databaseConfig } from "./_core/databaseConfig.js";
-import { friendships, sessionShares, surfSessions } from "../drizzle/schema.js";
+import { friendInvites, friendships, sessionShares, surfSessions } from "../drizzle/schema.js";
 import { withPlaybackUrl } from "./r2.js";
 import { TRPCError } from "@trpc/server";
 
@@ -459,37 +460,61 @@ export async function getBoardTypeStats(userId: number) {
  * Friends Management Queries
  */
 
+async function lockFriendshipPair(tx: Database, userId: number, friendId: number) {
+  for (const id of Array.from(new Set([Math.min(userId, friendId), Math.max(userId, friendId)]))) {
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, id)).for("update");
+  }
+  return tx.select().from(friendships).where(or(
+    and(eq(friendships.userId, userId), eq(friendships.friendId, friendId)),
+    and(eq(friendships.userId, friendId), eq(friendships.friendId, userId)),
+  )).orderBy(friendships.id).for("update");
+}
+
+export async function getFriendInviteCode(inviterId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [existing] = await db.select().from(friendInvites).where(eq(friendInvites.inviterId, inviterId));
+  if (existing) return existing.code;
+  await db.insert(friendInvites).values({ inviterId, code: randomBytes(32).toString("hex") })
+    .onDuplicateKeyUpdate({ set: { inviterId: sql`${friendInvites.inviterId}` } });
+  const [invite] = await db.select().from(friendInvites).where(eq(friendInvites.inviterId, inviterId));
+  if (!invite) throw new Error("Unable to create friend invite");
+  return invite.code;
+}
+
+export async function acceptFriendInvite(userId: number, code: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.transaction(async tx => {
+    const [invite] = await tx.select({ inviterId: users.id }).from(friendInvites)
+      .innerJoin(users, eq(users.id, friendInvites.inviterId)).where(eq(friendInvites.code, code));
+    if (!invite) throw new TRPCError({ code: "NOT_FOUND", message: "這個浪友邀請連結無效。" });
+    const { inviterId } = invite;
+    if (inviterId === userId) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "不能接受自己的浪友邀請。" });
+    }
+
+    const existing = await lockFriendshipPair(tx, inviterId, userId);
+    if (!existing.some(row => row.status === "accepted")) {
+      if (existing[0]) {
+        await tx.update(friendships).set({ status: "accepted" }).where(eq(friendships.id, existing[0].id));
+      } else {
+        await tx.insert(friendships).values({ userId: inviterId, friendId: userId, status: "accepted" });
+      }
+    }
+    return { success: true } as const;
+  }, { isolationLevel: "read committed" });
+}
+
 // Send friend request
 export async function sendFriendRequest(userId: number, friendId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
-  const { friendships } = await import("../drizzle/schema.js");
-  
-  // Check if friendship already exists
-  const { or, and } = await import("drizzle-orm");
-  const existing = await db
-    .select()
-    .from(friendships)
-    .where(
-      or(
-        and(eq(friendships.userId, userId), eq(friendships.friendId, friendId)),
-        and(eq(friendships.userId, friendId), eq(friendships.friendId, userId))
-      )
-    )
-    .limit(1);
-  
-  if (existing.length > 0) {
-    throw new Error("Friend request already exists");
-  }
-  
-  const result = await db.insert(friendships).values({
-    userId,
-    friendId,
-    status: "pending",
-  });
-  
-  return result;
+  return db.transaction(async tx => {
+    const existing = await lockFriendshipPair(tx, userId, friendId);
+    if (existing.length > 0) throw new Error("Friend request already exists");
+    return tx.insert(friendships).values({ userId, friendId, status: "pending" });
+  }, { isolationLevel: "read committed" });
 }
 
 // Accept friend request
