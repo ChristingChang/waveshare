@@ -98,13 +98,13 @@ describe("session share persistence", () => {
     expect(await getSessionsSharedWithUser(2)).toEqual([]);
   });
 
-  it("deletes shares only for the owner when deleting a record", async () => {
+  it("deletes shares and companion tags only for the owner when deleting a record", async () => {
     results = [[{ id: 7 }], []];
     const { deleteSurfSession } = await import("./db.js");
     await deleteSurfSession(7, 1);
-    expect(remove).toHaveBeenCalledTimes(2);
+    expect(remove).toHaveBeenCalledTimes(3);
     await deleteSurfSession(7, 2);
-    expect(remove).toHaveBeenCalledTimes(2);
+    expect(remove).toHaveBeenCalledTimes(3);
   });
 
   it("fails closed when the database is unavailable", async () => {

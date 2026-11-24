@@ -82,6 +82,13 @@ export const appRouter = router({
         return { ...shared, isOwner: false, photos: photos.map(toPhotoView) };
       }),
 
+    getCompanions: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const { getSessionCompanions } = await import("./db.js");
+        return getSessionCompanions(input.id, ctx.user.id);
+      }),
+
     getShares: protectedProcedure.input(z.object({ id: z.number().int().positive() }))
       .query(async ({ ctx, input }) => {
         const { getSessionById, getSessionShareIds } = await import("./db.js");
@@ -115,7 +122,7 @@ export const appRouter = router({
           note: z.string().optional(),
           boardType: z.string().optional(),
           waveQuality: z.number().min(1).max(5),
-          companionIds: z.array(z.number()).optional(),
+          companionIds: z.array(z.number().int().positive()).optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -124,20 +131,16 @@ export const appRouter = router({
         validatePhotoPaths(ctx.user.id, photoPaths);
         const { createSurfSession } = await import("./db.js");
         const { companionIds, photoPaths: _photoPaths, ...sessionData } = input;
-        
-        const result = await createSurfSession({
+        const record = {
           userId: ctx.user.id,
           ...sessionData,
           conditions: await conditionsForSession(sessionData),
           videoPath: input.videoPath ?? "",
           videoUrl: "",
-        }, photoPaths);
-        
-        // Add companions if provided
-        // Note: For now, companions feature is prepared but not fully integrated
-        // Will be completed in future update
-        
-        return result;
+        };
+        return companionIds?.length
+          ? createSurfSession(record, photoPaths, companionIds)
+          : createSurfSession(record, photoPaths);
       }),
 
     // Update session
@@ -154,7 +157,7 @@ export const appRouter = router({
           note: z.string().optional(),
           boardType: z.string().optional(),
           waveQuality: z.number().min(1).max(5).optional(),
-          companionIds: z.array(z.number()).optional(),
+          companionIds: z.array(z.number().int().positive()).optional(),
           addPhotoPaths: photoPathsInput.optional(),
           removePhotoIds: z.array(z.number().int().positive()).max(MAX_PHOTOS_PER_SESSION).optional(),
         })
@@ -189,15 +192,15 @@ export const appRouter = router({
             conditionUpdates = { conditions: await conditionsForSession({ ...current, ...updates }) };
           }
         }
-        const result = Object.keys(fields).length ? await updateSurfSession(id, ctx.user.id, { ...fields, ...conditionUpdates }) : undefined;
+        const sessionFields = { ...fields, ...conditionUpdates };
+        const result = companionIds !== undefined
+          ? await updateSurfSession(id, ctx.user.id, sessionFields, companionIds)
+          : Object.keys(sessionFields).length ? await updateSurfSession(id, ctx.user.id, sessionFields) : undefined;
         if (changesPhotos) {
           const removed = await changeSessionPhotos(id, ctx.user.id, removePhotoIds, addPhotoPaths);
           await deleteUnreferencedPhotos(ctx.user.id, removed.map(photo => photo.photoPath));
         }
-        
-        // Note: Companions feature is prepared but not fully integrated
-        // Will be completed in future update
-        
+
         return result;
       }),
 
