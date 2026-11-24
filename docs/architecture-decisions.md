@@ -12,6 +12,7 @@ ADR 記下「要改什麼、有哪些取捨、上線前要確認什麼」。**�
 | ADR-006 | 逐筆分享給指定好友 | 已接受；[PR #13](https://github.com/ChristingChang/waveshare/pull/13) 已合併到主分支 | 未驗證 |
 | ADR-007 | 影片選填，照片可私人附加 | 已接受；[PR #14](https://github.com/ChristingChang/waveshare/pull/14) 已合併到主分支 | 未驗證 |
 | ADR-008 | 由瀏覽器產生可帶出站外的分享圖卡 | 已接受；[PR #16](https://github.com/ChristingChang/waveshare/pull/16) 已合併到主分支 | 未驗證 |
+| ADR-009 | 從外部查詢浪況並隨日誌保存 | 已接受；[PR #20](https://github.com/ChristingChang/waveshare/pull/20) 及部署修正 [PR #22](https://github.com/ChristingChang/waveshare/pull/22) 已合併到主分支 | 未驗證 |
 
 ## ADR-001：新影片改由瀏覽器直接傳到 Cloudflare R2
 
@@ -131,7 +132,21 @@ ADR 記下「要改什麼、有哪些取捨、上線前要確認什麼」。**�
 
 **上線前。** 不需新增部署設定。在測試站確認兩種圖卡都可預覽和下載、僅本人可從紀錄產生圖卡，並在支援直接分享圖片的裝置確認分享只傳圖片檔。
 
+## ADR-009：從外部查詢浪況並隨日誌保存
+
+**狀態：已接受。** [PR #20](https://github.com/ChristingChang/waveshare/pull/20) 與 [PR #22](https://github.com/ChristingChang/waveshare/pull/22) 已合併到主分支；未在本次文件更新中驗證正式站。
+
+**背景。** 星等是浪友的主觀評分；回顧時也想知道當天的風浪與潮汐，不必每次自己查。
+
+**決策。** 由 WaveShare 在新增時或日期、地點、下水時間有變時查詢，把當次取得的資料與每個項目的來源一起存入日誌，而不是每次打開時重查。台灣當天的紀錄在有金鑰時優先用中央氣象署的沿海預報與潮汐資料，缺項由 Open-Meteo 的海象與天氣資料補上。其他情況（包括補舊紀錄）只用 Open-Meteo。氣象署的浪向不是湧浪方向，所以湧浪方向只取自 Open-Meteo。
+
+**取捨。** 回看時不必等外部服務回應，但看到的是當時存下的資料，不是即時海況。存檔時，外部請求最多等約 5.6 秒；查不到的項目不顯示，整筆查不到也能儲存，不用猜數值。Open-Meteo 的滿潮與乾潮時間來自潮位模型估算，不是實地觀測。自動資料不會取代浪友給的星等；既有紀錄也不會自動補上。
+
+**上線前。** 先執行 `drizzle/manual/0006_surf_conditions.sql` 新增欄位，再部署。選用的 `CWA_API_KEY`、驗收與舊紀錄補資料方式見[部署教學](DEPLOY.zh-TW.md)。
+
+**後續調整。** [PR #22](https://github.com/ChristingChang/waveshare/pull/22) 補上 Vercel 載入自動浪況程式時需要的副檔名，修正 API 啟動失敗；不改浪況來源、顯示方式或資料庫欄位。
+
 ## 切換時的依賴與待確認事項
 
-- **正式切換：** 先依[部署教學](DEPLOY.zh-TW.md)建立所需的表，再到測試站確認 Google 登入、好友分享及 R2 影片與照片的上傳和觀看。
+- **正式切換：** 先依[部署教學](DEPLOY.zh-TW.md)建立所需的表和欄位，再到測試站確認 Google 登入、好友分享、R2 影片與照片的上傳和觀看，以及自動浪況。
 - **資料接續：** 尚未確認正式站的既有資料、舊 Manus 帳號的對應方式，以及 Forge 影片是否須搬遷。R2 影片已改用私人播放（ADR-005）；舊 Forge 影片的原網址是否公開，仍未確認。
