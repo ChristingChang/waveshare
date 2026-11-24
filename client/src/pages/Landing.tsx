@@ -99,12 +99,12 @@ export default function Landing() {
             <span className="landing-highlight-icon"><LockKeyhole aria-hidden="true" size={22} /></span>
             <p className="landing-eyebrow">YOUR JOURNAL, YOUR CHOICE</p>
             <h2 id="privacy-title">你決定誰看得到</h2>
-            <p>每筆紀錄預設只有自己看得到。想分享時，再選定幾位浪友；沒有選的好友，看不到這筆紀錄與影片。</p>
+            <p>在 WaveShare，紀錄和附上的影片、照片預設只有自己登入後看得到。想分享時，再選定幾位浪友；轉傳紀錄連結不會開放存取。</p>
             <div className="landing-audience" aria-label="分享方式說明，非互動設定">
               <div><LockKeyhole aria-hidden="true" size={17} /><span>留給自己</span><span className="landing-audience-default">預設</span></div>
               <div><Users aria-hidden="true" size={17} /><span>或分享給選定的好友</span></div>
             </div>
-            <p className="landing-privacy-note">之後也能取消分享，讓紀錄回到自己的收藏。</p>
+            <p className="landing-privacy-note">之後也能取消站內分享。已發出的短效檔案連結，在到期前仍可開啟。</p>
           </article>
           <article className="landing-share" aria-labelledby="share-title">
             <div className="landing-share-copy">
@@ -112,7 +112,7 @@ export default function Landing() {
               <p className="landing-eyebrow">A MOMENT TO KEEP</p>
               <h2 id="share-title">把那天的海，<br />做成一張分享卡。</h2>
               <p>用自己的照片當背景，配上浪點、日期與當日浪況，存成圖片，分享到 IG 限動或 LINE。</p>
-              <p className="landing-share-note">你主動分享的是一張圖片，不是開放整本日誌。</p>
+              <p className="landing-share-note">分享的是一張可轉傳的圖片，不會開放原本的紀錄。</p>
             </div>
             <figure className="landing-share-figure">
               <img src="/landing/share-card-photo.webp" width="540" height="960" alt="照片背景的 WaveShare 衝浪分享卡：烏石港、日期、浪高、風向與潮汐，使用示範資料" loading="lazy" decoding="async" />
