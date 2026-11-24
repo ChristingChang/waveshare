@@ -1,12 +1,15 @@
 const MAX_FRAME_EDGE = 1920;
 const CAPTURE_TIMEOUT_MS = 5_000;
+const REMOTE_CAPTURE_TIMEOUT_MS = 10_000;
 
-export async function captureVideoFrame(file: File): Promise<File> {
+export async function captureVideoFrame(source: File | string): Promise<File> {
   const video = document.createElement("video");
   video.preload = "auto";
   video.muted = true;
   video.playsInline = true;
-  const url = URL.createObjectURL(file);
+  const local = typeof source !== "string";
+  const url = local ? URL.createObjectURL(source) : source;
+  if (!local) video.crossOrigin = "anonymous";
   let timeout: ReturnType<typeof setTimeout> | undefined;
 
   try {
@@ -40,7 +43,10 @@ export async function captureVideoFrame(file: File): Promise<File> {
         }
       }
 
-      timeout = setTimeout(() => reject(new Error("Video frame capture timed out")), CAPTURE_TIMEOUT_MS);
+      timeout = setTimeout(
+        () => reject(new Error("Video frame capture timed out")),
+        local ? CAPTURE_TIMEOUT_MS : REMOTE_CAPTURE_TIMEOUT_MS
+      );
       video.onerror = () => reject(new Error("Could not decode video"));
       video.onloadedmetadata = () => {
         try {
@@ -66,6 +72,6 @@ export async function captureVideoFrame(file: File): Promise<File> {
     video.onerror = video.onloadedmetadata = video.onloadeddata = video.onseeked = null;
     video.removeAttribute("src");
     video.load();
-    URL.revokeObjectURL(url);
+    if (local) URL.revokeObjectURL(url);
   }
 }

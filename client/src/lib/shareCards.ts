@@ -2,6 +2,7 @@ import { BOARD_TYPES } from "@shared/boardTypes";
 import type { ConditionsSnapshot } from "@shared/surfConditions";
 import { REGIONS, SURF_SPOTS } from "@shared/surfSpots";
 import { photoFileError, toDisplayablePhoto } from "./photoUpload";
+import { captureVideoFrame } from "./videoFrame";
 
 export const SHARE_CARD_WIDTH = 1080;
 export const SHARE_CARD_HEIGHT = 1920;
@@ -313,13 +314,23 @@ async function encodeShareCard(card: ShareCard, photo?: HTMLImageElement): Promi
   return new File([png], filename, { type: "image/png" });
 }
 
-export async function createShareCardFile(card: ShareCard, background?: File | string): Promise<File> {
+export async function createShareCardFile(card: ShareCard, background?: File | string, videoUrl?: string): Promise<File> {
   if (typeof background === "string") {
     try {
       return await encodeShareCard(card, await decodeImage(background, "anonymous"));
     } catch {
-      return encodeShareCard(card);
+      // Try the video if the saved photo cannot be used.
+    }
+  } else if (background) {
+    return encodeShareCard(card, await loadPhoto(background));
+  }
+  if (videoUrl) {
+    try {
+      const frame = await captureVideoFrame(videoUrl);
+      return await encodeShareCard(card, await decodePhoto(frame));
+    } catch {
+      // An unavailable frame should not prevent downloading a card.
     }
   }
-  return encodeShareCard(card, background ? await loadPhoto(background) : undefined);
+  return encodeShareCard(card);
 }
