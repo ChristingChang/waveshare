@@ -2,13 +2,14 @@ import type { Server } from "node:http";
 import express, { type Request } from "express";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignJWT } from "jose";
+import { TRPCError } from "@trpc/server";
 import { COOKIE_NAME } from "../shared/const.js";
 import { registerOAuthRoutes, GOOGLE_STATE_COOKIE } from "./_core/oauth.js";
 import { sdk } from "./_core/sdk.js";
 import { ENV } from "./_core/env.js";
-import { getUserByOpenId, upsertUser } from "./db.js";
+import { acceptFriendInvite, getUserByOpenId, upsertUser } from "./db.js";
 
-vi.mock("./db.js", () => ({ upsertUser: vi.fn(), getUserByOpenId: vi.fn() }));
+vi.mock("./db.js", () => ({ upsertUser: vi.fn(), getUserByOpenId: vi.fn(), acceptFriendInvite: vi.fn() }));
 vi.mock("./_core/env.js", () => ({ ENV: {
   googleClientId: "test-client", googleClientSecret: "test-secret", googleCallbackUrl: "",
   cookieSecret: "test-session-secret-not-for-production", isProduction: false,
@@ -22,6 +23,7 @@ const profile = { sub: "surfer-123", name: "Surfer", email: "surfer@example.com"
 
 beforeAll(async () => {
   const app = express();
+  app.use(express.urlencoded({ extended: false }));
   registerOAuthRoutes(app);
   await new Promise<void>(resolve => { server = app.listen(0, "127.0.0.1", resolve); });
   const address = server.address();
@@ -52,7 +54,60 @@ async function callback() {
   });
 }
 
+const inviteCode = "a".repeat(64);
+
+function startInvite(code = inviteCode, from = origin) {
+  return httpFetch(`${origin}/api/auth/google/invite`, {
+    method: "POST",
+    headers: { Origin: from },
+    body: new URLSearchParams({ code }),
+    redirect: "manual",
+  });
+}
+
+async function inviteCallback(cookieOverride?: (cookie: string) => string) {
+  const start = await startInvite();
+  expect(start.status).toBe(303);
+  const loginUrl = new URL(start.headers.get("location")!);
+  expect(loginUrl.href).not.toContain(inviteCode);
+  const state = loginUrl.searchParams.get("state");
+  const cookie = start.headers.get("set-cookie")!.split(";")[0];
+  return httpFetch(`${origin}/api/auth/google/callback?code=test-code&state=${state}`, {
+    headers: { Cookie: cookieOverride?.(cookie) ?? cookie }, redirect: "manual",
+  });
+}
+
 describe("Google OAuth", () => {
+  it("redeems an invite for the resolved Google account and lands on Friends", async () => {
+    googleFetch.mockResolvedValueOnce(Response.json({ access_token: "token" }))
+      .mockResolvedValueOnce(Response.json(profile));
+    vi.mocked(getUserByOpenId).mockResolvedValueOnce({ id: 42 } as never);
+    const response = await inviteCallback();
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/friends?joined=1");
+    expect(response.headers.get("set-cookie")).toContain(`${COOKIE_NAME}=`);
+    expect(getUserByOpenId).toHaveBeenCalledWith("google:surfer-123");
+    expect(vi.mocked(acceptFriendInvite).mock.calls).toEqual([[42, inviteCode]]);
+  });
+
+  it("keeps the session and returns to the invite when redemption fails", async () => {
+    googleFetch.mockResolvedValueOnce(Response.json({ access_token: "token" }))
+      .mockResolvedValueOnce(Response.json(profile));
+    vi.mocked(getUserByOpenId).mockResolvedValueOnce({ id: 42 } as never);
+    vi.mocked(acceptFriendInvite).mockRejectedValueOnce(new TRPCError({ code: "NOT_FOUND" }));
+    const response = await inviteCallback();
+    expect(response.headers.get("location")).toBe(`/invite/${inviteCode}?joinError=invalid`);
+    expect(response.headers.get("set-cookie")).toContain(`${COOKIE_NAME}=`);
+  });
+
+  it("rejects cross-origin starts, malformed codes, and tampered invite state", async () => {
+    expect((await startInvite(inviteCode, "https://example.com")).status).toBe(403);
+    expect((await startInvite("//example.com")).status).toBe(400);
+    expect((await inviteCallback(cookie => cookie.replace(inviteCode, "b".repeat(64)))).status).toBe(400);
+    expect(googleFetch).not.toHaveBeenCalled();
+    expect(acceptFriendInvite).not.toHaveBeenCalled();
+  });
+
   it("starts login with a random ten-minute HttpOnly Lax state cookie and request-origin callback", async () => {
     const response = await httpFetch(`${origin}/api/auth/google`, { redirect: "manual" });
     expect(response.status).toBe(302);
