@@ -14,13 +14,15 @@ import {
 import { createShareCardFile, type ShareCard } from "@/lib/shareCards";
 
 type Preview = { file: File; url: string; canShare: boolean };
-type CardSource = { card: ShareCard; recordPhotoUrl?: string };
-type Background = File | string | undefined;
+type CardSource = { card: ShareCard; recordPhotoUrl?: string; recordVideoUrl?: string };
+type Background = File | "auto" | undefined;
 type RenderResult = { background: Background; preview: Preview } | { background: Background; error: string };
 
-function ShareCardPreview({ card, recordPhotoUrl }: CardSource) {
+function ShareCardPreview({ card, recordPhotoUrl, recordVideoUrl }: CardSource) {
   const input = useRef<HTMLInputElement>(null);
-  const [background, setBackground] = useState<Background>(recordPhotoUrl);
+  const [background, setBackground] = useState<Background>(
+    recordPhotoUrl || recordVideoUrl ? "auto" : undefined
+  );
   const [result, setResult] = useState<RenderResult>();
   const [sharing, setSharing] = useState(false);
 
@@ -28,7 +30,10 @@ function ShareCardPreview({ card, recordPhotoUrl }: CardSource) {
     let active = true;
     let url: string | undefined;
 
-    createShareCardFile(card, background).then(file => {
+    const render = background === "auto" && recordVideoUrl
+      ? createShareCardFile(card, recordPhotoUrl, recordVideoUrl)
+      : createShareCardFile(card, background === "auto" ? recordPhotoUrl : background);
+    render.then(file => {
       if (!active) return;
       const canShare =
         typeof navigator.share === "function" &&
@@ -48,7 +53,7 @@ function ShareCardPreview({ card, recordPhotoUrl }: CardSource) {
       active = false;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [card, background]);
+  }, [card, background, recordPhotoUrl, recordVideoUrl]);
 
   async function shareImage(file: File) {
     setSharing(true);
@@ -127,11 +132,11 @@ function ShareCardPreview({ card, recordPhotoUrl }: CardSource) {
   );
 }
 
-export function ShareCardButton({ card, recordPhotoUrl }: CardSource) {
+export function ShareCardButton({ card, recordPhotoUrl, recordVideoUrl }: CardSource) {
   const [snapshot, setSnapshot] = useState<CardSource>();
 
   return (
-    <Dialog open={!!snapshot} onOpenChange={open => setSnapshot(open ? { card, recordPhotoUrl } : undefined)}>
+    <Dialog open={!!snapshot} onOpenChange={open => setSnapshot(open ? { card, recordPhotoUrl, recordVideoUrl } : undefined)}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Image /> 分享圖卡

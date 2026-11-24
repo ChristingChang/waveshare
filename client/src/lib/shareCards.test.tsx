@@ -2,6 +2,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SURF_SPOTS } from "@shared/surfSpots";
 import { createShareCardFile, drawShareCard, makeRecordCard, makeSpotsCard } from "./shareCards";
+import { captureVideoFrame } from "./videoFrame";
+
+vi.mock("./videoFrame", () => ({ captureVideoFrame: vi.fn() }));
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -196,4 +199,50 @@ describe("share cards", () => {
     if (state === "tainted") expect(canvases[1]).not.toBe(canvases[0]);
     expect(png).toMatchObject({ name: "waveshare-surf-record.png", type: "image/png" });
   });
+
+  it.each(["no photo", "working photo", "broken photo", "broken video"] as const)(
+    "chooses the best automatic background for a record with %s",
+    async state => {
+      const context = mockContext();
+      const photoUrl = "/api/photos/12";
+      const frame = new File(["JPEG"], "video-frame.jpg", { type: "image/jpeg" });
+      const capture = vi.mocked(captureVideoFrame);
+      capture.mockReset();
+      if (state === "broken video") capture.mockRejectedValue(new Error("Could not decode video"));
+      else capture.mockResolvedValue(frame);
+      vi.stubGlobal("URL", class extends URL {
+        static createObjectURL = vi.fn().mockReturnValue("blob:frame");
+        static revokeObjectURL = vi.fn();
+      });
+      vi.stubGlobal("Image", class {
+        src = "";
+        naturalWidth = 1920;
+        naturalHeight = 1080;
+        async decode() {
+          if (state === "broken photo" && this.src === photoUrl) throw new Error("Could not decode photo");
+        }
+      });
+      vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(callback => callback(new Blob(["PNG"])));
+
+      const png = await createShareCardFile(
+        makeRecordCard(record),
+        state === "working photo" || state === "broken photo" ? photoUrl : undefined,
+        "/api/videos/7"
+      );
+
+      if (state === "working photo") expect(capture).not.toHaveBeenCalled();
+      else expect(capture).toHaveBeenCalledWith("/api/videos/7");
+      if (state === "broken video") {
+        expect(context.drawImage).not.toHaveBeenCalled();
+        expect(context.arc).toHaveBeenCalled();
+      } else {
+        expect(context.drawImage).toHaveBeenCalledWith(
+          expect.objectContaining({ src: state === "working photo" ? photoUrl : "blob:frame" }),
+          expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number),
+          expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number)
+        );
+      }
+      expect(png.type).toBe("image/png");
+    }
+  );
 });

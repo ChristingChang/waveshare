@@ -79,6 +79,21 @@ describe("captureVideoFrame", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:video");
   });
 
+  it("loads a saved video with CORS enabled before assigning its URL", async () => {
+    const { createObjectURL, revokeObjectURL, video } = mockVideoCapture(8, 1920, 1080);
+    const assignSource = vi.fn();
+    Object.defineProperty(video, "src", {
+      set(url: string) { assignSource(url, Reflect.get(video, "crossOrigin")); },
+    });
+    const result = captureVideoFrame("/api/videos/7");
+    expect(assignSource).toHaveBeenCalledWith("/api/videos/7", "anonymous");
+    video.onloadedmetadata();
+    video.onseeked();
+    await expect(result).resolves.toMatchObject({ type: "image/jpeg" });
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+  });
+
   it("times out if the browser never supplies a frame", async () => {
     vi.useFakeTimers();
     const { revokeObjectURL, source } = mockVideoCapture(8, 1920, 1080);
