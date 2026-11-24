@@ -23,6 +23,7 @@ import { uploadErrorMessage } from "@/lib/uploadError";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { uploadPhotos } from "@/lib/photoUpload";
 import { captureVideoFrame } from "@/lib/videoFrame";
+import { uploadVideoFile } from "@/lib/videoUpload";
 
 export default function Upload() {
   const [, setLocation] = useLocation();
@@ -37,6 +38,7 @@ export default function Upload() {
   const [companionIds, setCompanionIds] = useState<number[]>([]);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [videoProgress, setVideoProgress] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const utils = trpc.useUtils();
@@ -88,29 +90,28 @@ export default function Upload() {
     }
 
     setUploading(true);
+    setVideoProgress(null);
 
     try {
       let videoPath: string | undefined;
+      let framePromise: Promise<File | null> | undefined;
       if (videoFile) {
         const presigned = await presignUpload.mutateAsync({
           contentType: videoFile.type as "video/mp4" | "video/quicktime" | "video/webm",
           size: videoFile.size,
         });
-        const uploadResponse = await fetch(presigned.uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": videoFile.type },
-          body: videoFile,
-        });
-
-        if (!uploadResponse.ok) {
-          throw new Error("影片上傳失敗，請稍後重試；若持續發生，請聯絡管理員檢查儲存服務設定");
+        setVideoProgress(0);
+        const transfer = uploadVideoFile(presigned.uploadUrl, videoFile, setVideoProgress);
+        if (photoFiles.length === 0) {
+          framePromise = captureVideoFrame(videoFile).catch(() => null);
         }
+        await transfer;
         videoPath = presigned.videoPath;
       }
       let photoPaths = await uploadPhotos(photoFiles, presignPhotoUpload.mutateAsync);
-      if (videoFile && photoFiles.length === 0) {
+      const frame = await framePromise;
+      if (frame) {
         try {
-          const frame = await captureVideoFrame(videoFile);
           photoPaths = await uploadPhotos([frame], presignPhotoUpload.mutateAsync);
         } catch {
           // A generated photo is optional; keep saving the uploaded video.
@@ -175,6 +176,7 @@ export default function Upload() {
                       size="sm"
                       className="absolute top-2 right-2"
                       onClick={handleRemoveVideo}
+                      disabled={uploading}
                     >
                       <X className="w-4 h-4 mr-1" />
                       移除
@@ -196,6 +198,7 @@ export default function Upload() {
                   type="file"
                   accept="video/mp4,video/quicktime,video/webm"
                   onChange={handleVideoChange}
+                  disabled={uploading}
                   className="hidden"
                 />
               </div>
@@ -285,6 +288,21 @@ export default function Upload() {
               </div>
             </CardContent>
           </Card>
+
+          {uploading && videoFile && (
+            <div className="mt-6 space-y-2 text-sm text-muted-foreground">
+              {videoProgress === null ? (
+                <p role="status">正在準備上傳影片…</p>
+              ) : videoProgress === 100 ? (
+                <p role="status">影片已上傳，正在處理照片並儲存紀錄…</p>
+              ) : (
+                <>
+                  <p>影片上傳中… {videoProgress}%</p>
+                  <progress className="h-2 w-full accent-primary" max={100} value={videoProgress} aria-label="影片上傳進度" />
+                </>
+              )}
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-3 mt-6">

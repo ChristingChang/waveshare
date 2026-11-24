@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { captureVideoFrame } from "@/lib/videoFrame";
 import Upload from "./Upload";
@@ -13,6 +13,8 @@ const { createSession, presignUpload, presignPhotoUpload } = vi.hoisted(() => ({
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     useUtils: () => ({}),
+    auth: { me: { useQuery: () => ({ data: { id: 1 } }) } },
+    friends: { getFriends: { useQuery: () => ({ data: [] }) } },
     surfSessions: {
       create: { useMutation: () => ({ mutateAsync: createSession }) },
       presignUpload: { useMutation: () => ({ mutateAsync: presignUpload }) },
@@ -35,7 +37,27 @@ vi.mock("@/components/PhotoPicker", () => ({
 
 vi.mock("@/lib/videoFrame", () => ({ captureVideoFrame: vi.fn() }));
 
+let videoRequest: VideoRequest;
+let autoCompleteVideo: boolean;
+
+class VideoRequest {
+  upload = { onprogress: null as ((event: { loaded: number }) => void) | null };
+  status = 200;
+  onload: (() => void) | null = null;
+  open = vi.fn();
+  setRequestHeader = vi.fn();
+  send = vi.fn(() => {
+    if (autoCompleteVideo) queueMicrotask(() => this.onload?.());
+  });
+
+  constructor() {
+    videoRequest = this;
+  }
+}
+
 beforeEach(() => {
+  autoCompleteVideo = true;
+  vi.stubGlobal("XMLHttpRequest", VideoRequest);
   presignUpload.mockResolvedValue({ uploadUrl: "https://r2.test/video", videoPath: "video-path" });
   presignPhotoUpload.mockResolvedValue({ uploadUrl: "https://r2.test/photo", photoPath: "photo-path" });
   vi.mocked(captureVideoFrame).mockResolvedValue(new File(["frame"], "video-frame.jpg", { type: "image/jpeg" }));
@@ -48,6 +70,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -62,6 +85,45 @@ function submitVideo(photo?: File) {
 }
 
 describe("video-only uploads", () => {
+  it("reports video transfer progress and prepares the frame during the direct PUT", async () => {
+    autoCompleteVideo = false;
+    const video = submitVideo();
+    expect(screen.getByRole("status").textContent).toContain("正在準備上傳影片");
+
+    await waitFor(() => expect(captureVideoFrame).toHaveBeenCalledWith(video));
+    expect(videoRequest.open).toHaveBeenCalledWith("PUT", "https://r2.test/video");
+    expect(videoRequest.setRequestHeader).toHaveBeenCalledWith("Content-Type", "video/mp4");
+    expect(videoRequest.send).toHaveBeenCalledWith(video);
+    expect(presignPhotoUpload).not.toHaveBeenCalled();
+    expect(createSession).not.toHaveBeenCalled();
+
+    act(() => videoRequest.upload.onprogress?.({ loaded: 2 }));
+    expect(screen.getByRole<HTMLProgressElement>("progressbar", { name: "影片上傳進度" }).value).toBe(40);
+    act(() => videoRequest.upload.onprogress?.({ loaded: video.size }));
+    expect(screen.getByRole<HTMLProgressElement>("progressbar", { name: "影片上傳進度" }).value).toBe(99);
+
+    act(() => videoRequest.onload?.());
+    expect(screen.getByRole("status").textContent).toContain("影片已上傳，正在處理照片並儲存紀錄");
+    await waitFor(() => expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
+      videoPath: "video-path", photoPaths: ["photo-path"],
+    })));
+  });
+
+  it("does not upload the prepared photo or save a session if R2 rejects the video", async () => {
+    autoCompleteVideo = false;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const video = submitVideo();
+    await waitFor(() => expect(captureVideoFrame).toHaveBeenCalledWith(video));
+
+    videoRequest.status = 403;
+    act(() => videoRequest.onload?.());
+
+    await waitFor(() => expect(screen.getByRole<HTMLButtonElement>("button", { name: "儲存" }).disabled).toBe(false));
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(presignPhotoUpload).not.toHaveBeenCalled();
+    expect(createSession).not.toHaveBeenCalled();
+  });
+
   it("saves the generated frame as a record photo", async () => {
     const video = submitVideo();
     await waitFor(() => expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
