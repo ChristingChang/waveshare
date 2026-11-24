@@ -4,11 +4,11 @@
 
 網站：<https://waveshare-six.vercel.app>（需 Google 登入）· Demo 影片：<https://youtu.be/wWEsldWr2uc>
 
-| 首頁 | 日曆 | 統計 |
-|:---:|:---:|:---:|
-| <img src="client/public/landing/app-home.webp" width="220" alt="首頁：總衝浪次數、浪點數量、平均評分與最近紀錄"> | <img src="client/public/landing/app-calendar.webp" width="220" alt="日曆：每天的衝浪紀錄筆數"> | <img src="client/public/landing/app-stats.webp" width="220" alt="統計：浪板使用次數與最常去的浪點"> |
+| 首頁 | 日曆 | 地圖 | 統計 |
+|:---:|:---:|:---:|:---:|
+| <img src="client/public/landing/app-home.webp" width="180" alt="首頁：總衝浪次數、浪點數量、平均評分與最近紀錄"> | <img src="client/public/landing/app-calendar.webp" width="180" alt="日曆：每天的衝浪紀錄筆數"> | <img src="client/public/landing/app-map.png" width="180" alt="浪點地圖：藍色為到過的浪點，灰色為尚未造訪"> | <img src="client/public/landing/app-stats.webp" width="180" alt="統計：浪板使用次數與最常去的浪點"> |
 
-截圖使用示範資料。
+首頁、日曆、統計使用示範資料；地圖為實際使用畫面。
 
 **想了解產品現在能做什麼、接下來要改什麼？** 請從[產品與設計文件](docs/README.md)開始。
 
