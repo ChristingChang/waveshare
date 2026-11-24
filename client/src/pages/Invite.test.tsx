@@ -58,6 +58,16 @@ describe("Invite", () => {
     },
   );
 
+  it.each([
+    ["Mozilla/5.0 (Linux; Android 15) Instagram 360", "⋮"],
+    ["Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) Instagram 360", "•••"],
+    ["Instagram 360", "•••"],
+  ])("shows the right menu icon for %s", (userAgent, menuIcon) => {
+    vi.stubGlobal("navigator", { userAgent });
+    render(<Invite code={code} isAuthenticated={false} />);
+    expect(screen.getByText(new RegExp(`「${menuIcon}」選單`))).toBeTruthy();
+  });
+
   it("keeps the URL and adds LINE's external-browser flag only once", () => {
     const invite = `https://wave.example/invite/${code}?from=line#top`;
     const target = `https://wave.example/invite/${code}?from=line&openExternalBrowser=1#top`;
