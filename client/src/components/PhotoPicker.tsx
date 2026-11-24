@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
-import { MAX_PHOTOS, photoFileError } from "@/lib/photoUpload";
+import { MAX_PHOTOS, photoFileError, toDisplayablePhoto } from "@/lib/photoUpload";
 
 type ExistingPhoto = { id: number; url: string };
 
@@ -17,8 +17,7 @@ type PhotoPickerProps = {
 
 export function PhotoPicker({ files, onFilesChange, existing = [], removedIds = [], onRemovedIdsChange, disabled }: PhotoPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const previews = useMemo(() => files.map(file => URL.createObjectURL(file)), [files]);
-  useEffect(() => () => previews.forEach(url => URL.revokeObjectURL(url)), [previews]);
+  const previews = usePreviews(files);
 
   const kept = existing.filter(photo => !removedIds.includes(photo.id));
   const remaining = MAX_PHOTOS - kept.length - files.length;
@@ -48,8 +47,8 @@ export function PhotoPicker({ files, onFilesChange, existing = [], removedIds = 
           <Thumb key={`existing-${photo.id}`} src={photo.url} disabled={disabled}
             onRemove={() => onRemovedIdsChange?.([...removedIds, photo.id])} />
         ))}
-        {previews.map((src, index) => (
-          <Thumb key={src} src={src} disabled={disabled}
+        {files.map((file, index) => (
+          <Thumb key={`new-${index}-${file.name}-${file.lastModified}`} src={previews[index]} disabled={disabled}
             onRemove={() => onFilesChange(files.filter((_, i) => i !== index))} />
         ))}
         {remaining > 0 && (
@@ -78,10 +77,39 @@ export function PhotoPicker({ files, onFilesChange, existing = [], removedIds = 
   );
 }
 
-function Thumb({ src, onRemove, disabled }: { src: string; onRemove: () => void; disabled?: boolean }) {
+// Browsers other than Safari cannot show HEIC, so preview the converted JPEG.
+function usePreviews(files: File[]) {
+  const [previews, setPreviews] = useState<(string | undefined)[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const urls: string[] = [];
+    setPreviews([]);
+    files.forEach((file, index) => {
+      toDisplayablePhoto(file).catch(() => file).then(displayable => {
+        if (cancelled) return;
+        const url = URL.createObjectURL(displayable);
+        urls.push(url);
+        setPreviews(current => {
+          const next = [...current];
+          next[index] = url;
+          return next;
+        });
+      });
+    });
+    return () => {
+      cancelled = true;
+      urls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [files]);
+  return previews;
+}
+
+function Thumb({ src, onRemove, disabled }: { src?: string; onRemove: () => void; disabled?: boolean }) {
   return (
     <div className="relative aspect-square">
-      <img src={src} alt="" className="w-full h-full object-cover rounded-lg bg-muted" />
+      {src
+        ? <img src={src} alt="" className="w-full h-full object-cover rounded-lg bg-muted" />
+        : <div className="w-full h-full rounded-lg bg-muted animate-pulse" aria-label="照片處理中" />}
       <button
         type="button"
         aria-label="移除照片"

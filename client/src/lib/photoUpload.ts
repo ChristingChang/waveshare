@@ -22,7 +22,19 @@ export function photoFileError(file: File) {
 }
 
 // Most browsers other than Safari cannot show HEIC, so convert it to JPEG before upload.
-export async function toDisplayablePhoto(file: File): Promise<File> {
+const conversions = new WeakMap<File, Promise<File>>();
+
+export function toDisplayablePhoto(file: File): Promise<File> {
+  let conversion = conversions.get(file);
+  if (!conversion) {
+    conversion = convertPhoto(file);
+    conversion.catch(() => conversions.delete(file));
+    conversions.set(file, conversion);
+  }
+  return conversion;
+}
+
+async function convertPhoto(file: File): Promise<File> {
   const type = photoContentType(file);
   if (type !== "image/heic" && type !== "image/heif") return file;
   const { default: heic2any } = await import("heic2any");
