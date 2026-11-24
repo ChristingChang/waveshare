@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUpRight, CalendarDays, ChartNoAxesCombined, NotebookPen, Waves } from "lucide-react";
+import { ArrowDown, ArrowUpRight, CalendarDays, ChartNoAxesCombined, Check, Image, LockKeyhole, NotebookPen, Timer, Users, Waves, Wind } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import "./landing.css";
 
@@ -61,9 +61,20 @@ export default function Landing() {
           <div className="landing-hero-copy">
             <p className="landing-eyebrow"><span /> 給每一個喜歡海的你</p>
             <h1 id="landing-title">每一道浪，<br />都值得<span className="landing-title-accent">留下。</span></h1>
-            <p className="landing-intro">你的衝浪紀錄，從這裡開始。<br />用 WaveShare 記下浪點、浪況與心得，<br className="landing-desktop-break" />把下水的日子，收藏成自己的浪旅誌。</p>
+            <p className="landing-intro">下水回來，打開記一下。<br />浪況幫你填好，心得留給自己寫。<br />把下水的日子，收藏成自己的浪旅誌。</p>
             <GoogleSignIn />
             <p className="landing-signin-note">用 Google 帳號就能開始，不用另外設定密碼。</p>
+            <figure className="landing-conditions" aria-label="浪況自動帶入示意">
+              <figcaption>浪高、風、潮汐，記錄時自動幫你填好</figcaption>
+              <div className="landing-conditions-top"><span>烏石港 · 2026/11/22</span><span><Check aria-hidden="true" size={12} /> 自動帶入</span></div>
+              <dl className="landing-conditions-grid">
+                <div><dt><Waves aria-hidden="true" size={14} />浪高</dt><dd>0.8–1.2 <span>m</span></dd></div>
+                <div><dt><Timer aria-hidden="true" size={14} />週期</dt><dd>8 <span>s</span></dd></div>
+                <div><dt><Wind aria-hidden="true" size={14} />東北風</dt><dd>3 <span>m/s</span></dd></div>
+                <div><dt><ArrowUpRight aria-hidden="true" size={14} />滿潮</dt><dd>11:20</dd></div>
+              </dl>
+              <p>示範資料，非即時預報。依浪點與日期帶入可取得的資料。</p>
+            </figure>
             <a href="#features" className="landing-explore">先看看 WaveShare <ArrowDown aria-hidden="true" size={16} /></a>
           </div>
 
@@ -81,6 +92,33 @@ export default function Landing() {
             <div className="landing-note landing-note-bottom"><span className="landing-note-dot" /><span>每一次下水，都是故事</span></div>
             <span className="landing-visual-caption">APP 預覽 · 示範資料</span>
           </div>
+        </section>
+
+        <section className="landing-highlights landing-container" aria-label="紀錄與分享，由你決定">
+          <article className="landing-privacy" aria-labelledby="privacy-title">
+            <span className="landing-highlight-icon"><LockKeyhole aria-hidden="true" size={22} /></span>
+            <p className="landing-eyebrow">YOUR JOURNAL, YOUR CHOICE</p>
+            <h2 id="privacy-title">你決定誰看得到</h2>
+            <p>每筆紀錄預設只有自己看得到。想分享時，再選定幾位浪友；沒有選的好友，看不到這筆紀錄與影片。</p>
+            <div className="landing-audience" aria-label="分享方式說明，非互動設定">
+              <div><LockKeyhole aria-hidden="true" size={17} /><span>留給自己</span><span className="landing-audience-default">預設</span></div>
+              <div><Users aria-hidden="true" size={17} /><span>或分享給選定的好友</span></div>
+            </div>
+            <p className="landing-privacy-note">之後也能取消分享，讓紀錄回到自己的收藏。</p>
+          </article>
+          <article className="landing-share" aria-labelledby="share-title">
+            <div className="landing-share-copy">
+              <span className="landing-highlight-icon"><Image aria-hidden="true" size={22} /></span>
+              <p className="landing-eyebrow">A MOMENT TO KEEP</p>
+              <h2 id="share-title">把那天的海，<br />做成一張分享卡。</h2>
+              <p>用自己的照片當背景，配上浪點、日期與當日浪況，存成圖片，分享到 IG 限動或 LINE。</p>
+              <p className="landing-share-note">你主動分享的是一張圖片，不是開放整本日誌。</p>
+            </div>
+            <figure className="landing-share-figure">
+              <img src="/landing/share-card-photo.webp" width="540" height="960" alt="照片背景的 WaveShare 衝浪分享卡：烏石港、日期、浪高、風向與潮汐，使用示範資料" loading="lazy" decoding="async" />
+              <figcaption>分享卡預覽 · 示範照片與資料</figcaption>
+            </figure>
+          </article>
         </section>
 
         <section id="features" className="landing-features" aria-labelledby="features-title">
