@@ -11,6 +11,7 @@ ADR 記下「要改什麼、有哪些取捨、上線前要確認什麼」。**�
 | ADR-005 | 影片只給本人播放（私人播放連結） | 已接受；[PR #10](https://github.com/ChristingChang/waveshare/pull/10) 已合併；私人連結保留，「只給本人」已由 [ADR-006](#adr-006逐筆分享給指定好友) 放寬 | 未驗證 |
 | ADR-006 | 逐筆分享給指定好友 | 已接受；[PR #13](https://github.com/ChristingChang/waveshare/pull/13) 已合併到主分支 | 未驗證 |
 | ADR-007 | 影片選填，照片可私人附加 | 已接受；[PR #14](https://github.com/ChristingChang/waveshare/pull/14) 已合併到主分支 | 未驗證 |
+| ADR-008 | 由瀏覽器產生可帶出站外的分享圖卡 | 已接受；[PR #16](https://github.com/ChristingChang/waveshare/pull/16) 已合併到主分支 | 未驗證 |
 
 ## ADR-001：新影片改由瀏覽器直接傳到 Cloudflare R2
 
@@ -61,6 +62,8 @@ ADR 記下「要改什麼、有哪些取捨、上線前要確認什麼」。**�
 **取捨。** 浪友需要 Google 帳號，但不用再開 Manus 或 GitHub 帳號。WaveShare 用 Google 提供的專屬代號（儲存為 `google:<sub>`）辨識帳號，不用電子郵件比對。電子郵件只有經 Google 驗證才會儲存，其他浪友也不能用它搜尋。就算地址相同，舊 Manus 使用者也會從新的 WaveShare 帳號開始，舊日誌和好友不會自動轉入；切換登入不會刪除舊資料。
 
 **上線前。** 依[部署教學](DEPLOY.zh-TW.md)完成設定，並在實際部署的測試站確認登入、取消授權、登出，以及用同一帳號再次登入仍能看到日誌。若要接回舊日誌，須另外規劃帳號對應。
+
+**後續調整。** [PR #9](https://github.com/ChristingChang/waveshare/pull/9) 在登入後的頁面上方加了「登出」，也移除了未登入時自動跳到 Google 的做法；[PR #17](https://github.com/ChristingChang/waveshare/pull/17) 將未登入畫面改為有示範資料的介紹頁。登出後會顯示介紹頁，按「使用 Google 登入」才前往 Google。原有的 Google 登入方式不變。
 
 - **登入網址：** WaveShare 從 `/api/auth/google` 把使用者送往 Google，Google 授權後回到 `/api/auth/google/callback`。
 - **部署設定：** 設定 `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` 與維持登入用的 `SESSION_SECRET`。`GOOGLE_CALLBACK_URL` 可選填；未填時，WaveShare 用發起登入的網站網址組成返回網址。這個返回網址必須和 Google 後台登記的完全一致。
@@ -113,6 +116,20 @@ ADR 記下「要改什麼、有哪些取捨、上線前要確認什麼」。**�
 **取捨。** 照片不用另外設定分享對象，但和影片一樣，已取得的 R2 連結到期前仍可能有效。每張最多 20 MiB；HEIC／HEIF 先在瀏覽器轉成 JPG，方便回看。編輯移除照片或刪除紀錄時，網站會嘗試刪除不再使用的照片檔；已啟用的每日清理也會處理逾 24 小時未存成紀錄的上傳。
 
 **上線前。** 在 TiDB Cloud 執行 `drizzle/manual/0005_photos.sql` 建立兩張照片表。確認沒有影片也能存紀錄、本人及指定好友可看照片，其他人不能從照片網址打開。步驟見[部署教學](DEPLOY.zh-TW.md)。
+
+**後續調整。** [PR #19](https://github.com/ChristingChang/waveshare/pull/19) 讓照片上傳失敗時依原因提示；如果缺少照片資料表，畫面會請管理員執行上述 SQL。上傳與觀看方式不變。
+
+## ADR-008：由瀏覽器產生可帶出站外的分享圖卡
+
+**狀態：已接受。** [PR #16](https://github.com/ChristingChang/waveshare/pull/16) 已合併到主分支；未在正式站驗證。
+
+**背景。** 浪友想在 IG 限時動態或 LINE 分享衝浪回憶，不必因此開放整筆紀錄或附上的影片、照片。
+
+**決策。** 在瀏覽器內把自己的紀錄摘要或浪點造訪進度做成 PNG，不另上傳圖片給 WaveShare，也不建立公開的紀錄連結。圖卡只用選定的欄位，紀錄圖卡不放心得、照片、影片或原始紀錄網址。站內逐筆分享仍按 [ADR-006](#adr-006逐筆分享給指定好友) 的規則。
+
+**取捨。** 只分享圖片檔，不改變日誌的可見範圍，也不必在網站額外儲存圖卡；但收件人可保留或轉傳圖片，無法從 WaveShare 收回。是否能直接叫出分享選單由瀏覽器決定，不支援時仍可下載圖片。
+
+**上線前。** 不需新增部署設定。在測試站確認兩種圖卡都可預覽和下載、僅本人可從紀錄產生圖卡，並在支援直接分享圖片的裝置確認分享只傳圖片檔。
 
 ## 切換時的依賴與待確認事項
 

@@ -4,6 +4,7 @@ import { appRouter } from "./routers.js";
 
 const { query } = vi.hoisted(() => ({ query: vi.fn() }));
 vi.mock("mysql2/promise", () => ({ createPool: () => ({ query }) }));
+vi.mock("./surfConditions.js", () => ({ conditionsForSession: vi.fn().mockResolvedValue(null) }));
 
 const ownerId = 1;
 const taggedId = 2;
@@ -22,7 +23,7 @@ beforeEach(() => {
   query.mockReset();
   let shared = false;
   const sessionRow = [
-    sessionId, ownerId, date, record.spotName, null, null, "", videoPath,
+    sessionId, ownerId, date, null, null, record.spotName, null, null, "", videoPath,
     null, null, record.waveQuality, new Date(), new Date(),
   ];
   query.mockImplementation(async ({ sql }: { sql: string }, params: unknown[]) => {

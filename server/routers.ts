@@ -3,6 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { z } from "zod";
+import { conditionsForSession } from "./surfConditions.js";
 import { TRPCError } from "@trpc/server";
 import { MAX_VIDEO_SIZE, deleteR2Video, presignVideo, validateVideoReference, withPlaybackUrl } from "./r2.js";
 import { MAX_PHOTOS_PER_SESSION, MAX_PHOTO_SIZE, deleteUnreferencedPhotos, presignPhoto, toPhotoView, validatePhotoPaths } from "./photos.js";
@@ -112,6 +113,7 @@ export const appRouter = router({
       .input(
         z.object({
           date: z.string(),
+          surfHour: z.number().int().min(0).max(23).nullable().optional(),
           spotName: z.string(),
           spotLat: z.string().optional(),
           spotLng: z.string().optional(),
@@ -132,6 +134,7 @@ export const appRouter = router({
         const record = {
           userId: ctx.user.id,
           ...sessionData,
+          conditions: await conditionsForSession(sessionData),
           videoPath: input.videoPath ?? "",
           videoUrl: "",
         };
@@ -147,6 +150,7 @@ export const appRouter = router({
           id: z.number(),
           videoPath: z.string().optional(),
           date: z.string().optional(),
+          surfHour: z.number().int().min(0).max(23).nullable().optional(),
           spotName: z.string().optional(),
           spotLat: z.string().optional(),
           spotLng: z.string().optional(),
@@ -179,9 +183,19 @@ export const appRouter = router({
         }
 
         const fields = input.videoPath === undefined ? updates : { ...updates, videoUrl: "" };
+        let conditionUpdates: { conditions?: string | null } = {};
+        const conditionKeys = ["date", "spotName", "spotLat", "spotLng", "surfHour"] as const;
+        if (conditionKeys.some(key => input[key] !== undefined)) {
+          const current = await getSessionById(id, ctx.user.id);
+          if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "找不到此紀錄" });
+          if (conditionKeys.some(key => input[key] !== undefined && input[key] !== current[key])) {
+            conditionUpdates = { conditions: await conditionsForSession({ ...current, ...updates }) };
+          }
+        }
+        const sessionFields = { ...fields, ...conditionUpdates };
         const result = companionIds !== undefined
-          ? await updateSurfSession(id, ctx.user.id, fields, companionIds)
-          : Object.keys(fields).length ? await updateSurfSession(id, ctx.user.id, fields) : undefined;
+          ? await updateSurfSession(id, ctx.user.id, sessionFields, companionIds)
+          : Object.keys(sessionFields).length ? await updateSurfSession(id, ctx.user.id, sessionFields) : undefined;
         if (changesPhotos) {
           const removed = await changeSessionPhotos(id, ctx.user.id, removePhotoIds, addPhotoPaths);
           await deleteUnreferencedPhotos(ctx.user.id, removed.map(photo => photo.photoPath));
