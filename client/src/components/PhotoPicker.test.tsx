@@ -7,6 +7,15 @@ vi.mock("heic2any", () => ({ default: vi.fn(async () => jpeg) }));
 
 import { PhotoPicker } from "./PhotoPicker";
 
+// jsdom's Blob has no arrayBuffer().
+Blob.prototype.arrayBuffer ??= function (this: Blob) {
+  return new Promise<ArrayBuffer>(resolve => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.readAsArrayBuffer(this);
+  });
+};
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

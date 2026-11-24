@@ -83,3 +83,14 @@ describe("HEIC conversion memory", () => {
     expect(Object.hasOwn(worker, "addEventListener")).toBe(false);
   });
 });
+
+describe("unreadable HEIC photos", () => {
+  it("fail without blocking later conversions", async () => {
+    const { toDisplayablePhoto } = await import("./photoUpload");
+    const unreadable = new File([new Uint8Array(10)], "bad.heic", { type: "image/heic" });
+    vi.spyOn(unreadable, "arrayBuffer").mockRejectedValue(new DOMException("NotReadableError"));
+    await expect(toDisplayablePhoto(unreadable)).rejects.toThrow();
+    const ok = await toDisplayablePhoto(new File([new Uint8Array(10)], "ok.heic", { type: "image/heic" }));
+    expect(ok.type).toBe("image/jpeg");
+  });
+});

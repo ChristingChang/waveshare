@@ -58,7 +58,9 @@ function heicToJpeg(file: File): Promise<Blob> {
       }) as Worker["addEventListener"];
     }
     try {
-      const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+      // heic2any hangs if its own file read fails, so read the file here where errors reject.
+      const bytes = new Blob([await file.arrayBuffer()]);
+      const converted = await heic2any({ blob: bytes, toType: "image/jpeg", quality: 0.9 });
       return Array.isArray(converted) ? converted[0] : converted;
     } finally {
       if (worker && addEventListener) {
