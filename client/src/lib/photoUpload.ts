@@ -37,10 +37,38 @@ export function toDisplayablePhoto(file: File): Promise<File> {
 async function convertPhoto(file: File): Promise<File> {
   const type = photoContentType(file);
   if (type !== "image/heic" && type !== "image/heif") return file;
-  const { default: heic2any } = await import("heic2any");
-  const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
-  const blob = Array.isArray(converted) ? converted[0] : converted;
+  const blob = await heicToJpeg(file);
   return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+}
+
+let heicQueue: Promise<unknown> = Promise.resolve();
+
+// heic2any never removes its worker "message" listeners, and each one keeps the decoded
+// pixels alive. Convert one photo at a time and remove the listeners it added.
+function heicToJpeg(file: File): Promise<Blob> {
+  const run = heicQueue.then(async () => {
+    const { default: heic2any } = await import("heic2any");
+    const worker = (globalThis as { __heic2any__worker?: Worker }).__heic2any__worker;
+    const added: Parameters<Worker["addEventListener"]>[] = [];
+    const addEventListener = worker?.addEventListener;
+    if (worker && addEventListener) {
+      worker.addEventListener = ((...args: Parameters<Worker["addEventListener"]>) => {
+        added.push(args);
+        addEventListener.apply(worker, args);
+      }) as Worker["addEventListener"];
+    }
+    try {
+      const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+      return Array.isArray(converted) ? converted[0] : converted;
+    } finally {
+      if (worker && addEventListener) {
+        delete (worker as Partial<Worker>).addEventListener;
+        added.forEach(([type, listener, options]) => worker.removeEventListener(type, listener, options));
+      }
+    }
+  });
+  heicQueue = run.catch(() => undefined);
+  return run;
 }
 
 export async function uploadPhotos(

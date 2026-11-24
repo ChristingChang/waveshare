@@ -64,3 +64,22 @@ describe("photo upload helpers", () => {
     expect(presign).not.toHaveBeenCalled();
   });
 });
+
+describe("HEIC conversion memory", () => {
+  it("removes the decoder listeners each conversion adds", async () => {
+    const { default: heic2any } = await import("heic2any");
+    const worker = new EventTarget();
+    const remove = vi.spyOn(worker, "removeEventListener");
+    vi.stubGlobal("__heic2any__worker", worker);
+    const listener = () => {};
+    vi.mocked(heic2any).mockImplementationOnce(async () => {
+      (globalThis as unknown as { __heic2any__worker: EventTarget }).__heic2any__worker.addEventListener("message", listener);
+      return new Blob([new Uint8Array(5)], { type: "image/jpeg" });
+    });
+    const { toDisplayablePhoto } = await import("./photoUpload");
+    const converted = await toDisplayablePhoto(new File([new Uint8Array(10)], "IMG_2.HEIC", { type: "image/heic" }));
+    expect(converted.type).toBe("image/jpeg");
+    expect(remove).toHaveBeenCalledWith("message", listener, undefined);
+    expect(Object.hasOwn(worker, "addEventListener")).toBe(false);
+  });
+});
