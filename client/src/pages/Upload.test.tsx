@@ -1,22 +1,30 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider, useMutation } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Route, Router } from "wouter";
+import { memoryLocation } from "wouter/memory-location";
 import { captureVideoFrame } from "@/lib/videoFrame";
 import Upload from "./Upload";
 
-const { createSession, presignUpload, presignPhotoUpload } = vi.hoisted(() => ({
+const { createSession, presignUpload, presignPhotoUpload, getInviteLink, invalidateSessions } = vi.hoisted(() => ({
   createSession: vi.fn(),
   presignUpload: vi.fn(),
   presignPhotoUpload: vi.fn(),
+  getInviteLink: vi.fn(),
+  invalidateSessions: vi.fn(),
 }));
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
-    useUtils: () => ({}),
+    useUtils: () => ({ surfSessions: { invalidate: invalidateSessions } }),
     auth: { me: { useQuery: () => ({ data: { id: 1 } }) } },
-    friends: { getFriends: { useQuery: () => ({ data: [] }) } },
+    friends: {
+      getFriends: { useQuery: () => ({ data: [] }) },
+      getInviteLink: { useMutation: () => useMutation({ mutationFn: () => getInviteLink() }) },
+    },
     surfSessions: {
-      create: { useMutation: () => ({ mutateAsync: createSession }) },
+      create: { useMutation: (options: object) => useMutation({ mutationFn: (input: unknown) => createSession(input), ...options }) },
       presignUpload: { useMutation: () => ({ mutateAsync: presignUpload }) },
       presignPhotoUpload: { useMutation: () => ({ mutateAsync: presignPhotoUpload }) },
     },
@@ -39,6 +47,9 @@ vi.mock("@/lib/videoFrame", () => ({ captureVideoFrame: vi.fn() }));
 
 let videoRequest: VideoRequest;
 let autoCompleteVideo: boolean;
+const invitePath = `/invite/${"a".repeat(64)}`;
+const inviteTitle = "邀請一起衝浪的朋友";
+const writeText = vi.fn();
 
 class VideoRequest {
   upload = { onprogress: null as ((event: { loaded: number }) => void) | null };
@@ -57,6 +68,8 @@ class VideoRequest {
 
 beforeEach(() => {
   autoCompleteVideo = true;
+  createSession.mockResolvedValue({ success: true });
+  getInviteLink.mockResolvedValue({ path: invitePath });
   vi.stubGlobal("XMLHttpRequest", VideoRequest);
   presignUpload.mockResolvedValue({ uploadUrl: "https://r2.test/video", videoPath: "video-path" });
   presignPhotoUpload.mockResolvedValue({ uploadUrl: "https://r2.test/photo", photoPath: "photo-path" });
@@ -65,6 +78,7 @@ beforeEach(() => {
   vi.stubGlobal("URL", class extends URL {
     static createObjectURL = vi.fn().mockReturnValue("blob:video");
   });
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
 });
 
 afterEach(() => {
@@ -72,10 +86,29 @@ afterEach(() => {
   vi.resetAllMocks();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  Reflect.deleteProperty(navigator, "clipboard");
 });
 
+function renderUpload() {
+  const { hook } = memoryLocation({ path: "/upload" });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <Router hook={hook}>
+        <Route path="/upload" component={Upload} />
+        <Route path="/">首頁內容</Route>
+      </Router>
+    </QueryClientProvider>
+  );
+}
+
+function submitLog() {
+  renderUpload();
+  fireEvent.change(screen.getByLabelText("浪點"), { target: { value: "外澳" } });
+  fireEvent.click(screen.getByRole("button", { name: "儲存" }));
+}
+
 function submitVideo(photo?: File) {
-  render(<Upload />);
+  renderUpload();
   const video = new File(["video"], "clip.mp4", { type: "video/mp4" });
   fireEvent.change(screen.getByLabelText(/影片/), { target: { files: [video] } });
   fireEvent.change(screen.getByLabelText("浪點"), { target: { value: "外澳" } });
@@ -83,6 +116,61 @@ function submitVideo(photo?: File) {
   fireEvent.click(screen.getByRole("button", { name: "儲存" }));
   return video;
 }
+
+describe("post-save friend invite", () => {
+  it("waits for a successful save, and offers a LINE message and a copyable invite link", async () => {
+    let finishSave!: () => void;
+    createSession.mockImplementationOnce(() => new Promise<void>(resolve => { finishSave = resolve; }));
+    submitLog();
+    await waitFor(() => expect(createSession).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(getInviteLink).not.toHaveBeenCalled();
+
+    await act(async () => finishSave());
+    await screen.findByRole("dialog", { name: inviteTitle });
+    const link = await screen.findByRole<HTMLAnchorElement>("link", { name: "用 LINE 傳送" });
+    const line = new URL(link.href);
+    const invite = new URL(invitePath, window.location.origin).href;
+    expect(line.origin + line.pathname).toBe("https://line.me/R/share");
+    expect(line.searchParams.get("text")).toBe(`一起衝浪好開心！來 WaveShare 加我當浪友吧 🌊\n${invite}`);
+    expect(getInviteLink).toHaveBeenCalledOnce();
+    expect(invalidateSessions).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: "複製邀請連結" }));
+    await screen.findByText("已複製邀請連結");
+    expect(writeText).toHaveBeenCalledWith(invite);
+    fireEvent.click(screen.getByRole("button", { name: "稍後再說" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("首頁內容")).toBeTruthy();
+  });
+
+  it("does not show an invite or navigate home if the log fails to save", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    createSession.mockRejectedValueOnce(new Error("Save failed"));
+    submitLog();
+    await screen.findByRole("button", { name: "儲存" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByText("首頁內容")).toBeNull();
+    expect(getInviteLink).not.toHaveBeenCalled();
+  });
+
+  it("allows retrying invite retrieval and manually copying if the clipboard is unavailable", async () => {
+    getInviteLink.mockRejectedValueOnce(new Error("Invite unavailable"));
+    writeText.mockRejectedValueOnce(new Error("Clipboard denied"));
+    submitLog();
+    expect((await screen.findByRole("alert")).textContent).toBe("無法取得邀請連結，請再試一次。");
+
+    fireEvent.click(screen.getByRole("button", { name: "重試" }));
+    await screen.findByRole("link", { name: "用 LINE 傳送" });
+    expect(createSession).toHaveBeenCalledOnce();
+    expect(getInviteLink).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "複製邀請連結" }));
+    const input = await screen.findByRole<HTMLInputElement>("textbox", { name: "浪友邀請連結" });
+    expect(input.value).toBe(new URL(invitePath, window.location.origin).href);
+    expect(input.readOnly).toBe(true);
+  });
+});
 
 describe("video-only uploads", () => {
   it("reports video transfer progress and prepares the frame during the direct PUT", async () => {

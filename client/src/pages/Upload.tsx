@@ -24,6 +24,7 @@ import { PhotoPicker } from "@/components/PhotoPicker";
 import { uploadPhotos } from "@/lib/photoUpload";
 import { captureVideoFrame } from "@/lib/videoFrame";
 import { uploadVideoFile } from "@/lib/videoUpload";
+import { PostSaveInviteDialog } from "@/components/PostSaveInviteDialog";
 
 export default function Upload() {
   const [, setLocation] = useLocation();
@@ -39,16 +40,20 @@ export default function Upload() {
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [videoProgress, setVideoProgress] = useState<number | null>(null);
+  const [showInvite, setShowInvite] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const utils = trpc.useUtils();
   const presignUpload = trpc.surfSessions.presignUpload.useMutation();
   const presignPhotoUpload = trpc.surfSessions.presignPhotoUpload.useMutation();
+  const inviteLink = trpc.friends.getInviteLink.useMutation();
   const createSession = trpc.surfSessions.create.useMutation({
     onSuccess: () => {
       utils.surfSessions.invalidate();
       toast.success("紀錄已儲存");
-      setLocation("/");
+      setUploading(false);
+      setShowInvite(true);
+      inviteLink.mutate();
     },
     onError: (error) => {
       toast.error("儲存失敗: " + error.message);
@@ -315,7 +320,7 @@ export default function Upload() {
             >
               取消
             </Button>
-            <Button type="submit" className="flex-1" disabled={uploading}>
+            <Button type="submit" className="flex-1" disabled={uploading || showInvite}>
               {uploading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -331,6 +336,14 @@ export default function Upload() {
           </div>
         </form>
       </div>
+      {showInvite && (
+        <PostSaveInviteDialog
+          invitePath={inviteLink.data?.path}
+          inviteError={inviteLink.isError}
+          onRetry={() => inviteLink.mutate()}
+          onDismiss={() => setLocation("/")}
+        />
+      )}
     </div>
   );
 }
