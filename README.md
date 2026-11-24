@@ -2,7 +2,21 @@
 
 **WaveShare 浪旅誌**是衝浪愛好者的影片日誌，讓您記錄每次下水的經驗、回顧造訪過的浪點，也能搜尋並加入好友。
 
+網站：<https://waveshare-six.vercel.app>（需 Google 登入）· Demo 影片：<https://youtu.be/wWEsldWr2uc>
+
+| 首頁 | 日曆 | 統計 |
+|:---:|:---:|:---:|
+| <img src="client/public/landing/app-home.webp" width="220" alt="首頁：總衝浪次數、浪點數量、平均評分與最近紀錄"> | <img src="client/public/landing/app-calendar.webp" width="220" alt="日曆：每天的衝浪紀錄筆數"> | <img src="client/public/landing/app-stats.webp" width="220" alt="統計：浪板使用次數與最常去的浪點"> |
+
+截圖使用示範資料。
+
 **想了解產品現在能做什麼、接下來要改什麼？** 請從[產品與設計文件](docs/README.md)開始。
+
+## 起源：2025 Vibe Coding 競賽
+
+WaveShare 是我參加中國文化大學推廣教育部主辦的「2025 Vibe Coding 青年放輕松」競賽的作品（隊名「下一衝幸福」，兩人團隊），由我負責產品發想、全部功能開發與 Demo 影片。從構思到交件只有 **3 週**，作品**晉級複選（正取 12 隊）**。
+
+最初的構想是「衝浪元宇宙」，開發後發現三週內做不完，於是先砍掉社群功能，做出一個使用者能完整用完的版本：記錄、回顧、地圖與統計。競賽結束後持續迭代，陸續加入照片紀錄、私人影片存取與好友分享等功能。
 
 ## 核心功能
 
@@ -13,22 +27,22 @@
 互動式地圖標示台灣的衝浪浪點。藍色代表您到過的浪點，灰色代表尚未造訪；點擊標記可以查看浪點與造訪次數。
 
 ### 📊 統計分析
-自動統計您的衝浪數據,包含總衝浪次數、探索浪點數量、平均浪況評分、最常造訪的浪點排行榜,以及各浪板類型的使用統計,幫助您了解自己的衝浪習慣。
+自動統計您的衝浪數據，包含總衝浪次數、探索浪點數量、平均浪況評分、最常造訪的浪點排行榜，以及各浪板類型的使用統計，幫助您了解自己的衝浪習慣。
 
 ### 📅 日曆視圖
-月曆介面清楚顯示每個月的衝浪紀錄,點擊日期即可查看當天的詳細資訊,讓您輕鬆回顧過往的衝浪時光。
+月曆介面清楚顯示每個月的衝浪紀錄，點擊日期即可查看當天的詳細資訊，讓您輕鬆回顧過往的衝浪時光。
 
 ### 👥 好友系統
 可以搜尋浪友、發送邀請，或接受、拒絕別人送來的邀請。目前好友名單不會顯示彼此的衝浪紀錄。
 
 ### 🏄 浪板管理
-記錄每次使用的浪板類型,包含長板、短板、魚板、軟板、槍板、趣味板、迷你馬力布等七種選項,統計頁面自動分析各浪板的使用頻率。
+記錄每次使用的浪板類型，包含長板、短板、魚板、軟板、槍板、趣味板、迷你馬力布等七種選項，統計頁面自動分析各浪板的使用頻率。
 
 ## 技術架構
 
 ### 前端技術
 - **React 19** - 現代化的使用者介面框架
-- **Tailwind CSS 4** - 實用優先的 CSS 框架,打造海洋風格主題
+- **Tailwind CSS 4** - 實用優先的 CSS 框架，打造海洋風格主題
 - **tRPC 11** - 端到端型別安全的 API 呼叫
 - **Wouter** - 輕量級路由管理
 - **Leaflet.js** - 開源互動式地圖函式庫
@@ -37,12 +51,12 @@
 ### 後端技術
 - **Express 4** - Node.js Web 應用程式框架
 - **tRPC 11** - 型別安全的 RPC 框架
-- **Drizzle ORM** - TypeScript ORM,支援 MySQL/TiDB
+- **Drizzle ORM** - TypeScript ORM，支援 MySQL/TiDB
 - **Google OAuth / jose** - Google 登入與本機簽發的 JWT Session
 - **Cloudflare R2 / AWS SDK** - 短效預簽網址，瀏覽器直接上傳影片
 
 ### 資料庫設計
-使用 MySQL/TiDB 儲存結構化資料,主要資料表包含:
+使用 MySQL/TiDB 儲存結構化資料，主要資料表包含：
 - `users` - 使用者資訊與認證
 - `surf_sessions` - 衝浪紀錄主表
 - `surf_spots` - 浪點統計資料
@@ -50,7 +64,7 @@
 - `session_companions` - 紀錄同行夥伴
 
 ### 雲端儲存
-整合 S3 相容儲存服務,所有上傳的影片檔案儲存於雲端,資料庫僅保存 URL 參照,確保系統效能與擴展性。
+整合 S3 相容儲存服務，所有上傳的影片檔案儲存於雲端，資料庫僅保存 URL 參照，確保系統效能與擴展性。
 
 ## 安裝與設定
 
@@ -64,7 +78,7 @@
 
 1. **複製專案儲存庫**
 ```bash
-git clone https://github.com/your-username/waveshare.git
+git clone https://github.com/ChristingChang/waveshare.git
 cd waveshare
 ```
 
@@ -78,7 +92,7 @@ pnpm install
 cp .env.example .env
 ```
 
-編輯 `.env` 檔案,填入您的資料庫連線資訊與 API 金鑰:
+編輯 `.env` 檔案，填入您的資料庫連線資訊與 API 金鑰：
 - `DATABASE_URL` - MySQL/TiDB 連線字串
 - `SESSION_SECRET` - Session 簽章金鑰（請隨機產生並妥善保管）
 - `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` - Google OAuth App 登入設定
@@ -103,15 +117,7 @@ pnpm dev
 pnpm test
 ```
 
-執行 Vitest 單元測試,驗證核心功能正常運作。
-
-## Vercel 部署
-
-使用專案根目錄的 `vercel.json`：`pnpm build` 產生 `dist/public`，Vercel 託管靜態前端，非檔案的 SPA 路徑回傳 `index.html`。`/api/*` 由 `api/index.ts` 匯出的 Express app 處理，共用 `server/_core/app.ts` 的 OAuth、上傳與 tRPC 路由；不會啟動本機監聽器。`pnpm dev` / `pnpm start` 的本機 Node server 行為不變。
-
-**影片直接上傳：** 登入後先由 tRPC 取得 10 分鐘有效的 R2 預簽 PUT 網址，再由瀏覽器直接上傳 MP4、MOV 或 WebM（最多 100 MiB）。影片不經 Vercel function，因此不受其約 4.5 MB body 限制；舊 `/api/upload-video` 路由已移除。播放時影片頁使用 `/api/videos/<紀錄編號>`：伺服器確認登入者是紀錄擁有者後，才轉址到 15 分鐘有效的 R2 預簽 GET 網址；未登入回 401，其他帳號回 404。R2 bucket 應關閉公開存取（r2.dev 與自訂網域），舊的公開網址才會失效。詳見 [R2 設定教學](docs/R2_SETUP.zh-TW.md) 與 [部署指南](DEPLOY_TO_VERCEL.md)。
-
-**影片選填與照片：** 紀錄可不附影片。每筆紀錄最多 10 張照片（JPG、PNG、HEIC，每張最多 20 MiB），同樣以預簽 PUT 直接上傳到 `r2/surf-photos/<使用者>/`，每人每 24 小時最多 100 張。照片透過 `/api/photos/<照片編號>` 顯示，權限與影片相同（目前僅擁有者），轉址到 15 分鐘有效的 R2 預簽 GET 網址。未被紀錄使用的照片由每日清理排程刪除。部署前需建立 `photo_uploads` 與 `session_photos` 資料表：在 TiDB Cloud SQL Editor 貼上執行 `drizzle/manual/0005_photos.sql`（或 `pnpm db:push`）。資料表尚未建立時，紀錄頁仍可開啟，只是不顯示照片。
+執行 Vitest 單元測試，驗證核心功能正常運作。
 
 ## 專案結構
 
@@ -133,55 +139,64 @@ waveshare/
 ├── shared/                # 前後端共用程式碼
 │   ├── surfSpots.ts       # 浪點資料與座標
 │   └── boardTypes.ts      # 浪板類型定義
-└── storage/               # S3 儲存整合
+├── storage/               # S3 儲存整合
+└── docs/                  # 產品、設計與部署文件（archive/ 為競賽時期的舊文件）
 ```
 
 ## 資安考量
 
 ### 已實施的安全措施
-- **環境變數隔離** - 所有敏感資訊(API 金鑰、資料庫密碼)儲存於 `.env` 檔案,並已加入 `.gitignore` 防止意外提交
-- **JWT Session 管理** - 使用 HttpOnly Cookie 儲存 Session,防止 XSS 攻擊
+- **環境變數隔離** - 所有敏感資訊（API 金鑰、資料庫密碼）儲存於 `.env` 檔案，並已加入 `.gitignore` 防止意外提交
+- **JWT Session 管理** - 使用 HttpOnly Cookie 儲存 Session，防止 XSS 攻擊
 - **tRPC 權限控制** - `protectedProcedure` 確保所有 API 呼叫都經過身份驗證
 - **影片上傳限制** - 登入後驗證申報格式與大小，簽發限定使用者路徑、Content-Type 與 Content-Length 的短效 R2 PUT 網址；非影片內容掃描
-- **SQL Injection 防護** - Drizzle ORM 自動參數化查詢,避免 SQL 注入攻擊
+- **SQL Injection 防護** - Drizzle ORM 自動參數化查詢，避免 SQL 注入攻擊
 
-### 部署前檢查清單
-- [ ] 更換所有預設密碼與 API 金鑰
-- [ ] 隨機產生 `SESSION_SECRET`
-- [ ] 啟用 HTTPS 加密連線
-- [ ] 設定資料庫防火牆規則
-- [ ] 定期備份資料庫
-- [ ] 監控異常登入行為
+### 自行部署時的注意事項
+- 更換所有預設密碼與 API 金鑰
+- 隨機產生 `SESSION_SECRET`
+- 啟用 HTTPS 加密連線
+- 設定資料庫防火牆規則
+- 定期備份資料庫
+- 監控異常登入行為
 
 ## 未來發展方向
 
 ### 短期目標
-- 完成紀錄標記好友功能,在上傳與編輯頁面新增多選好友選項
-- 實作分享紀錄功能,讓使用者可以將精彩衝浪影片分享給好友
-- 新增浪況條件記錄(浪高、風向、潮汐),幫助分析最佳衝浪時機
+- 完成紀錄標記好友功能，在上傳與編輯頁面新增多選好友選項
+- 實作分享紀錄功能，讓使用者可以將精彩衝浪影片分享給好友
+- 新增浪況條件記錄（浪高、風向、潮汐），幫助分析最佳衝浪時機
 
 ### 中期目標
-- 建立等級與成就系統,根據探索浪點數量與衝浪次數自動升級
-- 設計成就徽章(如「浪點探索者」、「百浪達人」)增加使用動力
-- 新增動態牆功能,顯示好友最新衝浪紀錄與互動
+- 建立等級與成就系統，根據探索浪點數量與衝浪次數自動升級
+- 設計成就徽章（如「浪點探索者」、「百浪達人」）增加使用動力
+- 新增動態牆功能，顯示好友最新衝浪紀錄與互動
 
 ### 長期願景
-打造完整的**衝浪元宇宙**,每位使用者擁有虛擬角色,隨著探索浪點、分享影片而升級。建立社群互動功能,包含留言、按讚、收藏浪點、追蹤浪友,形成活躍的衝浪社群網絡。
+打造完整的**衝浪元宇宙**，每位使用者擁有虛擬角色，隨著探索浪點、分享影片而升級。建立社群互動功能，包含留言、按讚、收藏浪點、追蹤浪友，形成活躍的衝浪社群網絡。
+
+## 附錄：Vercel 部署細節
+
+使用專案根目錄的 `vercel.json`：`pnpm build` 產生 `dist/public`，Vercel 託管靜態前端，非檔案的 SPA 路徑回傳 `index.html`。`/api/*` 由 `api/index.ts` 匯出的 Express app 處理，共用 `server/_core/app.ts` 的 OAuth、上傳與 tRPC 路由；不會啟動本機監聽器。`pnpm dev` / `pnpm start` 的本機 Node server 行為不變。
+
+**影片直接上傳：** 登入後先由 tRPC 取得 10 分鐘有效的 R2 預簽 PUT 網址，再由瀏覽器直接上傳 MP4、MOV 或 WebM（最多 100 MiB）。影片不經 Vercel function，因此不受其約 4.5 MB body 限制；舊 `/api/upload-video` 路由已移除。播放時影片頁使用 `/api/videos/<紀錄編號>`：伺服器確認登入者是紀錄擁有者後，才轉址到 15 分鐘有效的 R2 預簽 GET 網址；未登入回 401，其他帳號回 404。R2 bucket 應關閉公開存取（r2.dev 與自訂網域），舊的公開網址才會失效。詳見 [R2 設定教學](docs/R2_SETUP.zh-TW.md) 與 [部署指南](DEPLOY_TO_VERCEL.md)。
+
+**影片選填與照片：** 紀錄可不附影片。每筆紀錄最多 10 張照片（JPG、PNG、HEIC，每張最多 20 MiB），同樣以預簽 PUT 直接上傳到 `r2/surf-photos/<使用者>/`，每人每 24 小時最多 100 張。照片透過 `/api/photos/<照片編號>` 顯示，權限與影片相同（目前僅擁有者），轉址到 15 分鐘有效的 R2 預簽 GET 網址。未被紀錄使用的照片由每日清理排程刪除。部署前需建立 `photo_uploads` 與 `session_photos` 資料表：在 TiDB Cloud SQL Editor 貼上執行 `drizzle/manual/0005_photos.sql`（或 `pnpm db:push`）。資料表尚未建立時，紀錄頁仍可開啟，只是不顯示照片。
 
 ## 授權條款
 
-本專案採用 MIT 授權條款,詳見 [LICENSE](LICENSE) 檔案。
+本專案採用 MIT 授權條款，詳見 [LICENSE](LICENSE) 檔案。
 
 ## 貢獻指南
 
-歡迎提交 Issue 回報問題或建議新功能,也歡迎發送 Pull Request 貢獻程式碼。請確保您的程式碼:
-- 通過所有測試(`pnpm test`)
+歡迎提交 Issue 回報問題或建議新功能，也歡迎發送 Pull Request 貢獻程式碼。請確保您的程式碼：
+- 通過所有測試（`pnpm test`）
 - 遵循專案的程式碼風格
 - 包含適當的註解說明
 
 ## 聯絡方式
 
-如有任何問題或建議,歡迎透過 GitHub Issues 與我們聯繫。
+如有任何問題或建議，歡迎透過 GitHub Issues 與我們聯繫。
 
 ---
 
