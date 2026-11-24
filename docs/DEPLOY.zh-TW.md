@@ -73,10 +73,13 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 | `R2_SECRET_ACCESS_KEY` | 影片功能必填；R2 存取密鑰 |
 | `R2_BUCKET` | 影片功能必填；bucket 名稱 |
 | `CRON_SECRET` | 選填；另一組至少 16 字元的隨機密碼，啟用每日未使用影片清理；不要與 Session 金鑰共用 |
+| `CWA_API_KEY` | 選填；中央氣象署開放資料的金鑰，讓台灣當天的紀錄優先使用氣象署資料 |
 | `PORT` | 只供本機 / 自架使用，預設 3000；Vercel 不需填 |
 | `NODE_ENV` | Vercel 正式部署自動使用 `production`，不需手動填 |
 
 上述設定不要放到會公開給瀏覽器的前端變數。分頁標題「WaveShare 浪旅誌」和海浪圖示已隨網站提供，不用在 Vercel 設定；若以前填過 `VITE_APP_TITLE` 或 `VITE_APP_LOGO`，可刪除。`R2_PUBLIC_URL` 也已不再使用。無需設定舊 Manus OAuth、Forge 或分析服務變數。
+
+**自動浪況的外部服務。** 如要使用中央氣象署的鄉鎮沿海預報（`F-D0047-095`）及潮汐資料（`F-A0021-001`），請從[中央氣象署開放資料平臺](https://opendata.cwa.gov.tw/)取得金鑰，只填到 Vercel 的伺服器端環境變數 `CWA_API_KEY`，不要公開。網站也會向 [Open-Meteo](https://open-meteo.com/) 查詢海象及天氣（較早日期用歷史天氣），不用填金鑰。氣象署資料不足時由 Open-Meteo 補上；沒有氣象署金鑰時仍會查 Open-Meteo。若外部服務查不到資料，仍可儲存紀錄。
 
 ## 6. 初始化 / 更新資料庫
 
@@ -85,7 +88,8 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 1. **全新資料庫才需要這一步：** 先照編號依序開啟 [`0000` 到 `0003` 的 SQL 檔](../drizzle/)，貼到 SQL Editor 逐檔執行。若檔案中有 `--> statement-breakpoint`，貼上後先刪除那一整行（只移除分隔標記，不移除 SQL）。原有站點不用重跑已套用的檔案；影片上傳次數限制和清理需要 `0003` 建立的 `video_uploads` 表。
 2. **好友分享（0004）：** 開啟 [`drizzle/0004_session_shares.sql`](../drizzle/0004_session_shares.sql)，把內容貼到 SQL Editor，刪除 `--> statement-breakpoint` 那一行後執行，建立 `session_shares` 表及其索引。若已套用 0004，不要重跑。
 3. **照片（0005）：** 開啟 [`drizzle/manual/0005_photos.sql`](../drizzle/manual/0005_photos.sql)，整份貼到 SQL Editor 執行，建立 `photo_uploads` 和 `session_photos`。這份檔案可重複執行；不要另外執行 `drizzle/0005_photos.sql`，它是給 Drizzle 工具使用的同一項更新。
-4. 確認上述三張新表都出現在正確的資料庫，再回 Vercel 重新部署。如果 0004 曾執行到一半或不確定某次更新是否已完成，先請熟悉資料庫的人核對，不要直接重跑。手動貼 SQL 不會更新 Drizzle 的遷移紀錄；同一資料庫不要再用 `pnpm db:push` 或 `pnpm exec drizzle-kit migrate` 重跑已手動套用的檔案。
+4. **自動浪況與下水時間（0006，部署前必做）：** 開啟 [`drizzle/manual/0006_surf_conditions.sql`](../drizzle/manual/0006_surf_conditions.sql)，整份貼到 SQL Editor 執行，在 `surf_sessions` 加入可留空的 `surfHour`（下水時間）與 `conditions`（自動浪況）欄位。這份檔案可重複執行；不要另外執行 `drizzle/0006_surf_conditions.sql`。即使不設定 `CWA_API_KEY`，仍須先加欄位，否則網站無法正常讀取紀錄。
+5. 確認上述三張新表及兩個新欄位都出現在正確的資料庫，再回 Vercel 重新部署。如果 0004 曾執行到一半或不確定某次更新是否已完成，先請熟悉資料庫的人核對，不要直接重跑。手動貼 SQL 不會更新 Drizzle 的遷移紀錄；同一資料庫不要再用 `pnpm db:push` 或 `pnpm exec drizzle-kit migrate` 重跑已手動套用的檔案。
 
 ## 7. 重新部署與確認
 
@@ -95,9 +99,14 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 4. 用不同帳號確認新紀錄預設不分享。指定好友並儲存後，對方可從好友頁打開紀錄及其影片或照片，但不能編輯。未登入或未被選中的好友直接開啟 `/api/videos/<紀錄編號>` 或 `/api/photos/<照片編號>` 會被擋下；取消分享後，指定好友也無法再向 WaveShare 取得新連結。先前取得的 R2 連結仍可能用到 15 分鐘的有效期結束。另確認舊的 `r2.dev` 或公開自訂網域網址已無法播放。
 5. 每位使用者在任意連續 24 小時內最多申請 10 次影片和 100 次照片上傳，未完成的申請也會計入。設定 `CRON_SECRET` 後，Vercel 每天清理未使用的上傳，細節見 [R2 教學](R2_SETUP.zh-TW.md)。
 6. 在自己的紀錄詳細頁與地圖頁確認「分享圖卡」能預覽並下載 PNG；用支援直接分享圖片的瀏覽器再確認「分享圖片」可傳送圖片檔。圖卡由瀏覽器產生，不需要額外的部署設定。
+7. 用已知浪點各新增一筆有填、沒填下水時間的紀錄，確認兩筆都能儲存。查得到資料時，首頁最近紀錄及詳細頁應顯示選定整點或 06:00–18:00 的風浪資料與來源。若 API 都回傳 500，確認部署版本已包含 [PR #22](https://github.com/ChristingChang/waveshare/pull/22) 的修正；它解決 Vercel 上的 API 啟動錯誤，不需另加設定，也沒有新的資料庫更新。
 
 好友分享（[#13](https://github.com/ChristingChang/waveshare/pull/13)）和照片（[#14](https://github.com/ChristingChang/waveshare/pull/14)）都未在實際的 Cloudflare R2 或正式資料庫上測試。請先完成上述測試站檢查，再正式上線。
 
 若登入失敗，先確認 Google redirect URI 完全一致、應用程式已發布為 In production、Secret 無多餘空白、TiDB 遷移已完成，並且已重新部署。不要將登入 code、存取 token、Cookie 或資料庫密碼貼到公開 issue。
 
 若新增或編輯紀錄時，畫面提示「照片功能尚未啟用」且缺少照片資料表，請確認網站連到哪個 TiDB Cloud 資料庫，並由管理員依[第 6 步](#6-初始化--更新資料庫)在該資料庫執行 [`drizzle/manual/0005_photos.sql`](../drizzle/manual/0005_photos.sql)。只重新部署不會建立資料表。若畫面顯示其他原因，請依提示處理；例如已達次數上限就稍後再試，不必重跑 SQL。
+
+## 8. 為舊紀錄補浪況（選用）
+
+執行 0006 不會替舊紀錄補資料。如有需要，請協助部署的人先確認本機的 `DATABASE_URL` 指向要補資料的資料庫，再執行 `pnpm backfill:conditions --dry-run` 列出尚無自動浪況的紀錄；這一步只預覽，不寫入。確認無誤後，執行 `pnpm backfill:conditions`，只用 Open-Meteo 補上查得到的資料，不覆蓋已有的浪況。
