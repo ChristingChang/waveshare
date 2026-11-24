@@ -18,6 +18,7 @@ WaveShare 浪旅誌讓浪友記下衝浪的日期、浪點和心得，選擇附�
 | 項目   | 主分支現況 |
 | ------ | ---------- |
 | 分享   | 新紀錄預設不分享。本人可逐筆選擇好友；指定好友只能查看紀錄及影片和照片（[PR #13](https://github.com/ChristingChang/waveshare/pull/13)）。 |
+| 衝浪夥伴 | 本人可標記已接受邀請的好友為衝浪夥伴；標記只有本人看得到，也不會開放紀錄、影片或照片給對方（[PR #11](https://github.com/ChristingChang/waveshare/pull/11)）。 |
 | 影片與照片 | 影片可不填，每筆最多附 10 張私人照片（[PR #14](https://github.com/ChristingChang/waveshare/pull/14)）。檔案直接上傳到 Cloudflare R2；WaveShare 確認有權查看後才提供短效連結。 |
 | 登入   | 使用 Google 帳號；不需要 Manus 帳號，也不會自動接回舊 Manus 帳號的日誌（[PR #2](https://github.com/ChristingChang/waveshare/pull/2)）。 |
 | 資料庫 | 使用 TiDB Cloud 保存帳號、好友與衝浪紀錄；分享和照片所需的資料表須在部署前手動建立。 |
