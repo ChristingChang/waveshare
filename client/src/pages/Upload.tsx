@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { X, Upload as UploadIcon, Star, Video, Loader2 } from "lucide-react";
+import { CompanionPicker } from "@/components/CompanionPicker";
 import { SpotSelector } from "@/components/SpotSelector";
 import { BOARD_TYPES } from "@shared/boardTypes";
 import {
@@ -33,6 +34,7 @@ export default function Upload() {
   const [boardType, setBoardType] = useState("");
   const [waveQuality, setWaveQuality] = useState(3);
   const [note, setNote] = useState("");
+  const [companionIds, setCompanionIds] = useState<number[]>([]);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,6 +127,7 @@ export default function Upload() {
         boardType: boardType.trim() || undefined,
         note: note.trim() || undefined,
         waveQuality,
+        companionIds,
       });
     } catch (error) {
       console.error("Upload error:", error);
@@ -264,6 +267,8 @@ export default function Upload() {
                   ))}
                 </div>
               </div>
+
+              <CompanionPicker value={companionIds} onChange={setCompanionIds} disabled={uploading} />
 
               {/* Note */}
               <div className="space-y-2">

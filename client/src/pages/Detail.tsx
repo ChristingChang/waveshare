@@ -33,6 +33,10 @@ export default function Detail() {
     { id: sessionId },
     { enabled: sessionId > 0 }
   );
+  const companions = trpc.surfSessions.getCompanions.useQuery(
+    { id: sessionId },
+    { enabled: !!session?.isOwner }
+  );
 
   const utils = trpc.useUtils();
   const friends = trpc.friends.getFriends.useQuery(undefined, { enabled: !!session?.isOwner });
@@ -116,6 +120,7 @@ export default function Detail() {
               <Button
                 variant="ghost"
                 size="icon"
+                aria-label="編輯紀錄"
                 onClick={() => setLocation(`/edit/${sessionId}`)}
                 className="text-primary-foreground hover:bg-primary-foreground/10"
               >
@@ -197,6 +202,25 @@ export default function Detail() {
                   <Waves className="w-4 h-4 inline mr-2 text-primary" />
                   {session.boardType}
                 </div>
+              </div>
+            )}
+
+            {session.isOwner && (
+              <div>
+                <h2 className="text-sm text-muted-foreground mb-2">衝浪夥伴</h2>
+                {companions.data?.length ? (
+                  <ul className="flex flex-wrap gap-2">
+                    {companions.data.map(companion => (
+                      <li key={companion.companionId} className="max-w-full break-all rounded-lg bg-muted px-3 py-2 text-sm">
+                        {companion.name || companion.email || "未命名好友"}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {companions.isPending ? "正在載入…" : companions.isError ? "無法載入衝浪夥伴。" : "沒有標記衝浪夥伴。"}
+                  </p>
+                )}
               </div>
             )}
 

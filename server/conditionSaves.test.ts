@@ -87,6 +87,11 @@ describe("condition saves", () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(updateSurfSession).toHaveBeenLastCalledWith(1, 1, { note: "心得" });
   });
+  it("updates conditions and removes companion tags in the same edit", async () => {
+    await caller.surfSessions.update({ id: 1, surfHour: 7, companionIds: [] });
+    expect(fetch).toHaveBeenCalled();
+    expect(updateSurfSession).toHaveBeenCalledWith(1, 1, { surfHour: 7, conditions: null }, []);
+  });
   it("does not fetch or update another user's log and rejects invalid hours", async () => {
     vi.mocked(getSessionById).mockResolvedValue(undefined);
     await expect(
