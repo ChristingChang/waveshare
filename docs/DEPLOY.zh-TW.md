@@ -89,18 +89,21 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 2. **好友分享（0004）：** 開啟 [`drizzle/0004_session_shares.sql`](../drizzle/0004_session_shares.sql)，把內容貼到 SQL Editor，刪除 `--> statement-breakpoint` 那一行後執行，建立 `session_shares` 表及其索引。若已套用 0004，不要重跑。
 3. **照片（0005）：** 開啟 [`drizzle/manual/0005_photos.sql`](../drizzle/manual/0005_photos.sql)，整份貼到 SQL Editor 執行，建立 `photo_uploads` 和 `session_photos`。這份檔案可重複執行；不要另外執行 `drizzle/0005_photos.sql`，它是給 Drizzle 工具使用的同一項更新。
 4. **自動浪況與下水時間（0006，部署前必做）：** 開啟 [`drizzle/manual/0006_surf_conditions.sql`](../drizzle/manual/0006_surf_conditions.sql)，整份貼到 SQL Editor 執行，在 `surf_sessions` 加入可留空的 `surfHour`（下水時間）與 `conditions`（自動浪況）欄位。這份檔案可重複執行；不要另外執行 `drizzle/0006_surf_conditions.sql`。即使不設定 `CWA_API_KEY`，仍須先加欄位，否則網站無法正常讀取紀錄。
-5. **浪友邀請連結（0007）：** 開啟 [`drizzle/manual/0007_friend_invites.sql`](../drizzle/manual/0007_friend_invites.sql)，整份貼到 SQL Editor 執行，建立 `friend_invites` 表。這份檔案可重複執行；不要另外執行 `drizzle/0007_friend_invites.sql`。
-6. 確認上述四張新表及兩個新欄位都出現在正確的資料庫，再回 Vercel 重新部署。如果 0004 曾執行到一半或不確定某次更新是否已完成，先請熟悉資料庫的人核對，不要直接重跑。手動貼 SQL 不會更新 Drizzle 的遷移紀錄；同一資料庫不要再用 `pnpm db:push` 或 `pnpm exec drizzle-kit migrate` 重跑已手動套用的檔案。
+5. **浪友邀請連結（0007，部署前必做）：** 開啟 [`drizzle/manual/0007_friend_invites.sql`](../drizzle/manual/0007_friend_invites.sql)，整份貼到 SQL Editor 執行，建立 `friend_invites` 表。這張表保存每個帳號的邀請碼；缺少它就無法取得連結或透過連結加入。這份檔案可重複執行；不要另外執行 `drizzle/0007_friend_invites.sql`。
+6. 確認 `video_uploads`、`session_shares`、`photo_uploads`、`session_photos`、`friend_invites`，以及 `surf_sessions` 的下水時間與浪況欄位都出現在正確的資料庫，再回 Vercel 重新部署。如果 0004 曾執行到一半或不確定某次更新是否已完成，先請熟悉資料庫的人核對，不要直接重跑。手動貼 SQL 不會更新 Drizzle 的遷移紀錄；同一資料庫不要再用 `pnpm db:push` 或 `pnpm exec drizzle-kit migrate` 重跑已手動套用的檔案。
 
 ## 7. 重新部署與確認
 
 1. 回到 Vercel **Deployments** → 目前版本 → **Redeploy**。
-2. 用未登入的視窗開啟網站，確認分頁標題和海浪圖示正確，先看到介紹頁及示範畫面，不會自動前往 Google。按「使用 Google 登入」才前往 Google，成功後回到首頁。從頁面上方按「登出」，應顯示介紹頁，不會自動再登入；再試一次手動登入。
-3. 在測試站新增一筆有影片的紀錄，以及一筆有照片、無影片的紀錄。確認本人能播放影片、點照片縮圖看大圖、編輯照片與刪除紀錄。選用的影片及照片直接上傳 R2，不受 Vercel 約 4.5 MB 的函式請求大小限制。
+2. 用未登入的視窗開啟網站，確認分頁標題和海浪圖示正確，介紹頁有浪況示範、隱私說明和照片背景的圖卡示範。不會自動前往 Google；按「使用 Google 登入」才前往 Google，成功後回到首頁。從頁面上方按「登出」，應顯示介紹頁，不會自動再登入；再試一次手動登入。
+3. 在測試站新增一筆只有影片的紀錄，以及一筆有照片、無影片的紀錄。確認送出影片時有上傳進度，影片傳完後會顯示正在處理照片與儲存紀錄，存好才回首頁。確認本人能播放影片、點照片縮圖看大圖、編輯照片與刪除紀錄。選用的影片及照片直接上傳 R2，不受 Vercel 約 4.5 MB 的函式請求大小限制。
 4. 用不同帳號確認新紀錄預設不分享。指定好友並儲存後，對方可從好友頁打開紀錄及其影片或照片，但不能編輯。未登入或未被選中的好友直接開啟 `/api/videos/<紀錄編號>` 或 `/api/photos/<照片編號>` 會被擋下；取消分享後，指定好友也無法再向 WaveShare 取得新連結。先前取得的 R2 連結仍可能用到 15 分鐘的有效期結束。另確認舊的 `r2.dev` 或公開自訂網域網址已無法播放。
 5. 每位使用者在任意連續 24 小時內最多申請 10 次影片和 100 次照片上傳，未完成的申請也會計入。設定 `CRON_SECRET` 後，Vercel 每天清理未使用的上傳，細節見 [R2 教學](R2_SETUP.zh-TW.md)。
 6. 在自己的紀錄詳細頁與地圖頁確認「分享圖卡」能預覽並下載 PNG；用支援直接分享圖片的瀏覽器再確認「分享圖片」可傳送圖片檔。圖卡由瀏覽器產生，不需要額外的部署設定。
 7. 用已知浪點各新增一筆有填、沒填下水時間的紀錄，確認兩筆都能儲存。查得到資料時，首頁最近紀錄及詳細頁應顯示選定整點或 06:00–18:00 的風浪資料與來源。若 API 都回傳 500，確認部署版本已包含 [PR #22](https://github.com/ChristingChang/waveshare/pull/22) 的修正；它解決 Vercel 上的 API 啟動錯誤，不需另加設定，也沒有新的資料庫更新。
+8. 用帳號 A 在「浪友」頁取得並複製邀請連結，讓尚未登入的帳號 B 開啟。確認連結進入邀請頁而不是介紹頁，按「使用 Google 登入並加入浪友」後，B 會回到浪友頁並看到加入成功，兩邊好友清單都能看到對方。再用已登入的帳號開啟連結，確認能按「加入浪友」。若在 Android 的 IG 或 LINE 內開啟且未登入，應看到「⋮」選單提示（iPhone 等其他裝置為「•••」）；LINE 若已跳到外部瀏覽器，就在那裡繼續。加入不會自動分享紀錄。
+
+介紹頁更新和影片上傳進度不需要額外設定，也不需要再執行資料庫更新。浪友邀請沿用原本的 Google 回呼網址，不用在 Google 另加一個網址。若無法取得邀請連結或登入後無法加入，請先確認 `friend_invites` 已依[第 6 步](#6-初始化--更新資料庫)建立在網站使用的資料庫。
 
 好友分享（[#13](https://github.com/ChristingChang/waveshare/pull/13)）和照片（[#14](https://github.com/ChristingChang/waveshare/pull/14)）都未在實際的 Cloudflare R2 或正式資料庫上測試。請先完成上述測試站檢查，再正式上線。
 

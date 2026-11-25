@@ -13,6 +13,7 @@ ADR 記下「要改什麼、有哪些取捨、上線前要確認什麼」。**�
 | ADR-007 | 影片選填，照片可私人附加 | 已接受；[PR #14](https://github.com/ChristingChang/waveshare/pull/14) 已合併到主分支 | 未驗證 |
 | ADR-008 | 由瀏覽器產生可帶出站外的分享圖卡 | 已接受；[PR #16](https://github.com/ChristingChang/waveshare/pull/16) 已合併到主分支 | 未驗證 |
 | ADR-009 | 從外部查詢浪況並隨日誌保存 | 已接受；[PR #20](https://github.com/ChristingChang/waveshare/pull/20) 及部署修正 [PR #22](https://github.com/ChristingChang/waveshare/pull/22) 已合併到主分支 | 未驗證 |
+| ADR-011 | 在 Google 登入前後接續浪友邀請 | 已接受；[PR #28](https://github.com/ChristingChang/waveshare/pull/28) 已合併到主分支 | 未驗證 |
 
 ## ADR-001：新影片改由瀏覽器直接傳到 Cloudflare R2
 
@@ -145,6 +146,16 @@ ADR 記下「要改什麼、有哪些取捨、上線前要確認什麼」。**�
 **上線前。** 先執行 `drizzle/manual/0006_surf_conditions.sql` 新增欄位，再部署。選用的 `CWA_API_KEY`、驗收與舊紀錄補資料方式見[部署教學](DEPLOY.zh-TW.md)。
 
 **後續調整。** [PR #22](https://github.com/ChristingChang/waveshare/pull/22) 補上 Vercel 載入自動浪況程式時需要的副檔名，修正 API 啟動失敗；不改浪況來源、顯示方式或資料庫欄位。
+
+## ADR-011：在 Google 登入前後接續浪友邀請
+
+**背景。** 浪友需要一條可以從 IG 或 LINE 傳給多人的連結。對方可能尚未登入，但完成 Google 登入後不應需要再找一次原連結。
+
+**決策。** TiDB 的 `friend_invites` 表為每個發出邀請的帳號保存一組不含個人資料的隨機代碼，可重複使用。未登入的人按「使用 Google 登入並加入浪友」時，WaveShare 把邀請碼和這次登入的核對碼一起放在有簽章的短效 Cookie（瀏覽器暫存資料）中，有效期 10 分鐘；不把邀請碼傳給 Google。回站時先核對內容並完成登入，再由伺服器處理邀請。一般登入仍回首頁；邀請成功則去浪友頁，加入失敗則回邀請頁顯示原因。
+
+**取捨。** 同一條連結可給多人使用，拿到轉傳連結並登入的人也能加入，無須再等邀請人同意。網站沿用原本的好友關係，不重複建立，也不讓使用者加自己為好友。這個連結只用於加好友，不授予日誌存取權；紀錄仍按 [ADR-006](#adr-006逐筆分享給指定好友) 逐筆分享。短效的是登入時暫存的資料，不是邀請連結。
+
+**上線前。** [依部署教學](DEPLOY.zh-TW.md#6-初始化--更新資料庫)先執行 [`drizzle/manual/0007_friend_invites.sql`](../drizzle/manual/0007_friend_invites.sql)，再用另一個帳號驗證邀請登入與一般登入各自回到正確的頁面。
 
 ## 切換時的依賴與待確認事項
 
