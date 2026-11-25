@@ -21,6 +21,6 @@ WaveShare 浪旅誌讓浪友記下衝浪的日期、浪點和心得，選擇附�
 | 影片與照片 | 影片可不填，每筆最多附 10 張私人照片（[PR #14](https://github.com/ChristingChang/waveshare/pull/14)）。檔案直接上傳到 Cloudflare R2；WaveShare 確認有權查看後才提供短效連結。 |
 | 登入   | 使用 Google 帳號；不需要 Manus 帳號，也不會自動接回舊 Manus 帳號的日誌（[PR #2](https://github.com/ChristingChang/waveshare/pull/2)）。 |
 | 資料庫 | 使用 TiDB Cloud 保存帳號、好友與衝浪紀錄；分享和照片所需的資料表須在部署前手動建立。 |
-| 分享圖卡 | 紀錄圖卡以第一張照片為預設背景，沒有可用照片時用海浪插畫；有存浪況就一併顯示（[PR #23](https://github.com/ChristingChang/waveshare/pull/23)）。只上傳影片時，瀏覽器會嘗試擷取一張紀錄照片（[PR #24](https://github.com/ChristingChang/waveshare/pull/24)）。 |
+| 分享圖卡 | 紀錄圖卡依序用第一張紀錄照片、影片畫面、海浪插畫當背景；有存浪況就一併顯示（[PR #23](https://github.com/ChristingChang/waveshare/pull/23)、[PR #30](https://github.com/ChristingChang/waveshare/pull/30)）。只上傳影片時，瀏覽器也會嘗試擷取一張照片存進紀錄（[PR #24](https://github.com/ChristingChang/waveshare/pull/24)）。 |
 
 準備部署時，請依[部署教學](DEPLOY.zh-TW.md)和 [R2 設定教學](R2_SETUP.zh-TW.md)完成設定（包括關閉 R2 公開存取）。好友分享和照片功能未在實際的 Cloudflare R2 或正式資料庫上測試，請先在測試站確認。
